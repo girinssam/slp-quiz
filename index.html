@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>조음음운장애 학습 퀴즈 | @slp_girin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== CSS Reset & Variables ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary: #4ECDC4;
+  --primary-dark: #2C9B8A;
+  --primary-light: #E8F8F7;
+  --accent: #FF6B6B;
+  --success: #51CF66;
+  --warning: #FFD43B;
+  --danger: #FF6B6B;
+  --gray-50: #F8FAFB;
+  --gray-100: #F1F3F5;
+  --gray-200: #E9ECEF;
+  --gray-300: #DEE2E6;
+  --gray-400: #CED4DA;
+  --gray-500: #ADB5BD;
+  --gray-600: #868E96;
+  --gray-700: #495057;
+  --gray-800: #343A40;
+  --gray-900: #212529;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 24px rgba(0,0,0,0.12);
+  --transition: 0.2s ease;
+}
+
+body {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 20px;
+  background: var(--gray-50);
+  color: var(--gray-800);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Header ===== */
+.header {
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+  color: white;
+  padding: 16px 20px;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 12px rgba(46,155,138,0.3);
+}
+.header h1 { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.3px; }
+.header .brand { font-size: 0.85rem; opacity: 0.85; margin-top: 2px; }
+
+/* ===== Main Layout ===== */
+.container { width: 100%; max-width: 820px; margin: 0 auto; padding: 20px 16px; flex: 1; }
+
+/* ===== Tabs ===== */
+.tab-bar {
+  display: flex;
+  background: white;
+  border-radius: var(--radius);
+  padding: 4px;
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+  gap: 2px;
+}
+.tab-btn {
+  flex: 1;
+  padding: 14px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 9px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
+}
+.tab-btn.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(78,205,196,0.35);
+}
+.tab-btn:hover:not(.active) { background: var(--gray-100); }
+
+.tab-panel { display: none; width: 100%; }
+.tab-panel.active { display: block; }
+
+/* ===== Cards ===== */
+.card {
+  width: 100%;
+  background: white;
+  border-radius: var(--radius);
+  padding: 32px;
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--gray-800);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-title .icon { font-size: 1.1rem; }
+
+/* ===== Form Elements ===== */
+.form-group { margin-bottom: 20px; }
+.form-label {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray-700);
+  margin-bottom: 8px;
+}
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  font-size: 18px;
+  font-family: inherit;
+  color: var(--gray-800);
+  background: white;
+  transition: var(--transition);
+  outline: none;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(78,205,196,0.15);
+}
+.form-textarea { min-height: 80px; resize: vertical; }
+.form-input:disabled, .form-select:disabled {
+  background: var(--gray-100);
+  color: var(--gray-500);
+  cursor: not-allowed;
+}
+
+.radio-group { display: flex; gap: 14px; flex-wrap: wrap; }
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border: 1.5px solid var(--gray-200);
+  border-radius: 30px;
+  cursor: pointer;
+  font-size: 18px;
+  transition: var(--transition);
+  user-select: none;
+}
+.radio-label input[type="radio"] { display: none; }
+.radio-label:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+.radio-label .dot {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 2.5px solid var(--gray-400);
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+.radio-label:has(input:checked) .dot {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 28px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font-size: 20px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+}
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(78,205,196,0.3);
+}
+.btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+.btn-secondary { background: var(--gray-100); color: var(--gray-700); }
+.btn-secondary:hover { background: var(--gray-200); }
+.btn-danger { background: var(--danger); color: white; }
+.btn-danger:hover { background: #e55a5a; }
+.btn-success { background: var(--success); color: white; }
+.btn-success:hover { background: #40c057; }
+.btn-warning { background: var(--warning); color: var(--gray-800); }
+.btn-sm { padding: 10px 16px; font-size: 16px; }
+.btn-full { width: 100%; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+/* ===== Status Badges ===== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.badge-success { background: #D3F9D8; color: #2B8A3E; }
+.badge-warning { background: #FFF3BF; color: #E67700; }
+.badge-gray { background: var(--gray-100); color: var(--gray-600); }
+.badge-primary { background: #DBF4F2; color: var(--primary-dark); }
+.badge-danger { background: #FFE3E3; color: #C92A2A; }
+
+/* ===== Week Grid ===== */
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.week-card {
+  background: white;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  padding: 14px 8px;
+  text-align: center;
+  cursor: default;
+}
+.week-card .week-num { font-size: 0.95rem; color: var(--gray-500); }
+.week-card .week-status { font-size: 0.9rem; font-weight: 700; margin-top: 6px; }
+.week-card.submitted { border-color: var(--success); background: #F0FBF1; }
+.week-card.submitted .week-status { color: #2B8A3E; }
+.week-card.not-submitted { border-color: #FFC94D; background: #FFFBF0; }
+.week-card.not-submitted .week-status { color: #E67700; }
+.week-card.closed { border-color: var(--gray-300); background: var(--gray-50); }
+.week-card.closed .week-status { color: var(--gray-500); }
+.week-card.has-quiz { border-color: var(--primary); background: var(--primary-light); }
+.week-card.has-quiz .week-status { color: var(--primary-dark); }
+.week-card.approved { border-color: var(--primary-dark); background: #E8F8F7; }
+.week-card.approved .week-status { color: var(--primary-dark); }
+
+/* ===== Quiz UI ===== */
+#quizScreen, #quizResult { width: 100%; }
+#prevBtn, #nextBtn { font-size: 22px; padding: 20px 32px; }
+
+.quiz-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.progress-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: var(--gray-200);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-bar { height: 100%; background: var(--primary); border-radius: 3px; transition: width 0.3s ease; }
+.progress-text { font-size: 1rem; font-weight: 600; color: var(--gray-600); white-space: nowrap; }
+
+.question-card {
+  background: var(--primary-light);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.question-type-badge {
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: var(--primary);
+  color: white;
+  display: inline-block;
+  margin-bottom: 12px;
+}
+.question-text { font-size: 1.3rem; font-weight: 600; color: var(--gray-800); line-height: 1.7; }
+
+.choices-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.choice-item label {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  font-size: 20px;
+  background: white;
+}
+.choice-item label:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  font-weight: 600;
+}
+.choice-item input[type="radio"] { display: none; }
+.choice-num {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: var(--gray-200);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700;
+  flex-shrink: 0;
+}
+.choice-item label:has(input:checked) .choice-num { background: var(--primary); color: white; }
+
+.ox-buttons { display: flex; gap: 12px; margin-top: 12px; }
+.ox-btn {
+  flex: 1;
+  padding: 20px;
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius);
+  background: white;
+  font-size: 2rem;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: inherit;
+}
+.ox-btn.selected-O { border-color: var(--success); background: #F0FBF1; }
+.ox-btn.selected-X { border-color: var(--danger); background: #FFF5F5; }
+
+/* ===== Result UI ===== */
+.score-display {
+  text-align: center;
+  padding: 24px;
+  background: linear-gradient(135deg, var(--primary-light) 0%, white 100%);
+  border-radius: var(--radius);
+  margin-bottom: 20px;
+}
+.score-num { font-size: 2.8rem; font-weight: 800; color: var(--primary-dark); }
+.score-label { font-size: 0.85rem; color: var(--gray-600); margin-top: 4px; }
+
+.result-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: white;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--gray-200);
+  margin-bottom: 8px;
+}
+.result-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 2px; }
+.result-details { flex: 1; min-width: 0; }
+.result-q { font-size: 16px; color: var(--gray-600); margin-bottom: 4px; }
+.result-ans { font-size: 16px; }
+.result-correct { color: #2B8A3E; font-weight: 600; }
+.result-wrong { color: #C92A2A; font-weight: 600; }
+.result-pending { color: var(--gray-600); font-style: italic; }
+
+/* ===== Admin UI ===== */
+.admin-panel { display: none; }
+.admin-panel.active { display: block; }
+
+.submission-item {
+  background: white;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.submission-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.submission-meta { font-size: 0.78rem; color: var(--gray-600); }
+.submission-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.result-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  font-size: 0.83rem;
+}
+.result-row-header {
+  background: var(--gray-100);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--gray-700);
+}
+
+.deadline-row {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+/* ===== Toast ===== */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  width: calc(100% - 32px);
+  max-width: 480px;
+}
+.toast {
+  padding: 12px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: white;
+  box-shadow: var(--shadow-md);
+  animation: slideUp 0.3s ease;
+  pointer-events: all;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toast-success { background: #2B8A3E; }
+.toast-error { background: #C92A2A; }
+.toast-info { background: var(--primary-dark); }
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Spinner ===== */
+.spinner-overlay {
+  position: fixed; inset: 0;
+  background: rgba(255,255,255,0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9990;
+  backdrop-filter: blur(2px);
+}
+.spinner-overlay.active { display: flex; }
+.spinner {
+  width: 40px; height: 40px;
+  border: 4px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center;
+  padding: 20px;
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  border-top: 1px solid var(--gray-200);
+  background: white;
+}
+.footer a { color: var(--primary-dark); text-decoration: none; font-weight: 600; }
+.footer a:hover { text-decoration: underline; }
+
+/* ===== Misc ===== */
+.section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--gray-500);
+  margin-bottom: 10px;
+}
+.divider { height: 1px; background: var(--gray-200); margin: 16px 0; }
+.text-center { text-align: center; }
+.mt-8 { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.flex { display: flex; }
+.gap-8 { gap: 8px; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.flex-wrap { flex-wrap: wrap; }
+.hidden { display: none !important; }
+
+.setup-warning {
+  background: #FFF9DB;
+  border: 2px solid #FFE066;
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+.setup-warning h3 { color: #E67700; margin-bottom: 8px; }
+.setup-warning p { font-size: 0.85rem; color: var(--gray-700); }
+
+.choices-editor { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+
+@media (max-width: 480px) {
+  .week-grid { grid-template-columns: repeat(3, 1fr); }
+  .result-row { grid-template-columns: 1fr 1fr; font-size: 14px; }
+  .header h1 { font-size: 1.1rem; }
+  .tab-btn { font-size: 15px; padding: 12px 4px; }
+  .card { padding: 20px; }
+  .btn { padding: 16px 20px; font-size: 18px; }
+  .radio-label { padding: 10px 14px; font-size: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="header">
+  <h1>🎙️ 조음음운장애 학습 퀴즈</h1>
+  <div class="brand">@slp_girin</div>
+</header>
+
+<!-- ===== SETUP WARNING (shown if GAS_URL not set) ===== -->
+<div id="setupWarning" class="container hidden">
+  <div class="setup-warning">
+    <h3>⚙️ 설정이 필요합니다</h3>
+    <p>index.html 상단의 <code>GAS_URL</code>에 Google Apps Script 배포 URL을 입력해주세요.</p>
+  </div>
+</div>
+
+<!-- ===== MAIN CONTENT ===== -->
+<main class="container" id="mainContent">
+
+  <!-- Student Tabs -->
+  <div id="studentView">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('submit')">📝 문제 제출</button>
+      <button class="tab-btn" onclick="switchTab('quiz')">🧩 퀴즈 풀기</button>
+      <button class="tab-btn" onclick="switchTab('status')">📊 제출 현황</button>
+    </div>
+
+    <!-- Tab 1: 문제 제출 -->
+    <div id="tab-submit" class="tab-panel active">
+      <div class="card">
+        <div class="card-title"><span class="icon">✏️</span> 문제 제출</div>
+
+        <div class="form-group">
+          <label class="form-label">이름</label>
+          <input type="text" id="sub-name" class="form-input" placeholder="이름을 입력하세요">
+        </div>
+        <div class="form-group">
+          <label class="form-label">학번</label>
+          <input type="text" id="sub-sid" class="form-input" placeholder="학번을 입력하세요">
+        </div>
+        <div class="form-group">
+          <label class="form-label">분반</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" name="sub-class" value="A"><span class="dot"></span>A반</label>
+            <label class="radio-label"><input type="radio" name="sub-class" value="B"><span class="dot"></span>B반</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">주차 선택</label>
+          <select id="sub-week" class="form-select">
+            <option value="">-- 주차를 선택하세요 --</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">문제 유형</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" name="sub-type" value="객관식" onchange="updateQuestionForm()"><span class="dot"></span>객관식</label>
+            <label class="radio-label"><input type="radio" name="sub-type" value="OX" onchange="updateQuestionForm()"><span class="dot"></span>O·X</label>
+            <label class="radio-label"><input type="radio" name="sub-type" value="단답형" onchange="updateQuestionForm()"><span class="dot"></span>단답형</label>
+            <label class="radio-label"><input type="radio" name="sub-type" value="서술형" onchange="updateQuestionForm()"><span class="dot"></span>서술형</label>
+          </div>
+        </div>
+
+        <div id="questionForm" class="hidden">
+          <div class="form-group">
+            <label class="form-label">문제 내용</label>
+            <textarea id="sub-question" class="form-textarea" placeholder="문제를 입력하세요"></textarea>
+          </div>
+
+          <!-- 객관식 보기 -->
+          <div id="choicesForm" class="hidden">
+            <div class="form-group">
+              <label class="form-label">보기 (4개)</label>
+              <div class="choices-editor">
+                <input type="text" id="ch1" class="form-input" placeholder="① 보기 1">
+                <input type="text" id="ch2" class="form-input" placeholder="② 보기 2">
+                <input type="text" id="ch3" class="form-input" placeholder="③ 보기 3">
+                <input type="text" id="ch4" class="form-input" placeholder="④ 보기 4">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">정답 선택</label>
+              <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="sub-mcq-ans" value="1"><span class="dot"></span>①</label>
+                <label class="radio-label"><input type="radio" name="sub-mcq-ans" value="2"><span class="dot"></span>②</label>
+                <label class="radio-label"><input type="radio" name="sub-mcq-ans" value="3"><span class="dot"></span>③</label>
+                <label class="radio-label"><input type="radio" name="sub-mcq-ans" value="4"><span class="dot"></span>④</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- OX 정답 -->
+          <div id="oxForm" class="hidden">
+            <div class="form-group">
+              <label class="form-label">정답</label>
+              <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="sub-ox-ans" value="O"><span class="dot"></span>O (맞음)</label>
+                <label class="radio-label"><input type="radio" name="sub-ox-ans" value="X"><span class="dot"></span>X (틀림)</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- 단답/서술 정답 -->
+          <div id="shortForm" class="hidden">
+            <div class="form-group">
+              <label class="form-label">모범답안</label>
+              <textarea id="sub-answer-text" class="form-textarea" placeholder="모범답안을 입력하세요"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-full mt-16" onclick="submitQuestion()">제출하기</button>
+      </div>
+    </div>
+
+    <!-- Tab 2: 퀴즈 풀기 -->
+    <div id="tab-quiz" class="tab-panel">
+      <!-- 입장 폼 -->
+      <div id="quizEntryForm" class="card">
+        <div class="card-title"><span class="icon">🧩</span> 퀴즈 풀기</div>
+        <div class="form-group">
+          <label class="form-label">이름</label>
+          <input type="text" id="quiz-name" class="form-input" placeholder="이름을 입력하세요">
+        </div>
+        <div class="form-group">
+          <label class="form-label">학번</label>
+          <input type="text" id="quiz-sid" class="form-input" placeholder="학번을 입력하세요">
+        </div>
+        <div class="form-group">
+          <label class="form-label">분반</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" name="quiz-class" value="A" onchange="updateQuizWeekDropdown()"><span class="dot"></span>A반</label>
+            <label class="radio-label"><input type="radio" name="quiz-class" value="B" onchange="updateQuizWeekDropdown()"><span class="dot"></span>B반</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">주차 선택</label>
+          <select id="quiz-week" class="form-select">
+            <option value="">-- 분반 선택 후 주차를 선택하세요 --</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-full mt-8" onclick="startQuiz()">퀴즈 시작 🚀</button>
+      </div>
+
+      <!-- 퀴즈 진행 화면 -->
+      <div id="quizScreen" class="hidden">
+        <div class="quiz-progress">
+          <div class="progress-bar-wrap"><div class="progress-bar" id="quizProgressBar"></div></div>
+          <span class="progress-text" id="quizProgressText">1/1</span>
+        </div>
+        <div id="questionDisplay"></div>
+        <div class="flex gap-8 mt-12">
+          <button class="btn btn-secondary" id="prevBtn" onclick="prevQuestion()">◀ 이전</button>
+          <button class="btn btn-primary" style="flex:1" id="nextBtn" onclick="nextQuestion()">다음 ▶</button>
+        </div>
+      </div>
+
+      <!-- 결과 화면 -->
+      <div id="quizResult" class="hidden">
+        <div class="score-display">
+          <div class="score-num" id="scoreNum">0/0</div>
+          <div class="score-label">정답 수 / 전체 문제</div>
+        </div>
+        <div id="resultDetails"></div>
+        <button class="btn btn-secondary btn-full mt-12" onclick="resetQuiz()">처음으로</button>
+      </div>
+    </div>
+
+    <!-- Tab 3: 제출 현황 -->
+    <div id="tab-status" class="tab-panel">
+      <div class="card">
+        <div class="card-title"><span class="icon">🔍</span> 제출 현황 조회</div>
+        <div class="flex gap-8" style="margin-bottom:14px">
+          <input type="text" id="st-name" class="form-input" placeholder="이름">
+          <input type="text" id="st-sid" class="form-input" placeholder="학번">
+        </div>
+        <div class="form-group">
+          <label class="form-label">분반</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" name="st-class" value="A" onchange="reloadStatusIfReady()"><span class="dot"></span>A반</label>
+            <label class="radio-label"><input type="radio" name="st-class" value="B" onchange="reloadStatusIfReady()"><span class="dot"></span>B반</label>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="loadStatus()">조회하기</button>
+      </div>
+      <div id="statusResult" class="hidden">
+        <div class="card">
+          <div class="card-title"><span class="icon">📋</span> 문제 제출 현황</div>
+          <div class="week-grid" id="submissionGrid"></div>
+          <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; font-size:0.9rem;">
+            <span>✅ 제출완료</span>
+            <span>🟡 미제출</span>
+            <span>⬜ 마감</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon">🧩</span> 퀴즈 응시 현황</div>
+          <div class="week-grid" id="quizGrid"></div>
+          <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; font-size:0.9rem;">
+            <span>✅ 응시완료</span>
+            <span>🟡 미응시</span>
+            <span>⬜ 퀴즈없음</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /studentView -->
+
+  <!-- ===== ADMIN VIEW ===== -->
+  <div id="adminView" class="hidden">
+    <!-- 로그인 폼 -->
+    <div id="adminLoginForm" class="card">
+      <div class="card-title"><span class="icon">🔐</span> 관리자 로그인</div>
+      <div class="form-group">
+        <label class="form-label">비밀번호</label>
+        <input type="password" id="adminPw" class="form-input" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')adminLogin()">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="adminLogin()">로그인</button>
+      <div class="mt-12 text-center">
+        <button class="btn btn-secondary btn-sm" onclick="showStudentView()">← 학생 화면으로</button>
+      </div>
+    </div>
+
+    <!-- 관리자 대시보드 -->
+    <div id="adminDashboard" class="hidden">
+      <div class="flex justify-between items-center" style="margin-bottom:16px">
+        <span style="font-weight:700;font-size:1rem;">🛠️ 관리자 패널</span>
+        <div class="flex gap-8">
+          <button class="btn btn-secondary btn-sm" onclick="showStudentView()">학생화면</button>
+          <button class="btn btn-danger btn-sm" onclick="adminLogout()">로그아웃</button>
+        </div>
+      </div>
+
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchAdminTab('review')">📋 검토</button>
+        <button class="tab-btn" onclick="switchAdminTab('publish')">📤 업로드</button>
+        <button class="tab-btn" onclick="switchAdminTab('results')">📊 결과</button>
+        <button class="tab-btn" onclick="switchAdminTab('deadline')">⏰ 기한</button>
+      </div>
+
+      <!-- 탭A: 문제 검토 -->
+      <div id="atab-review" class="admin-panel active">
+        <div class="card">
+          <div class="card-title"><span class="icon">📋</span> 제출 문제 검토</div>
+          <div class="flex gap-8 items-center" style="margin-bottom:14px">
+            <select id="adminReviewWeek" class="form-select">
+              <option value="">전체 주차</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="loadAdminSubmissions()">조회</button>
+          </div>
+          <div id="adminSubmissionsList"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon">➕</span> 교수자 문제 추가</div>
+          <div class="form-group">
+            <label class="form-label">주차</label>
+            <select id="profWeek" class="form-select">
+              <option value="">-- 주차 선택 --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">문제 유형</label>
+            <div class="radio-group">
+              <label class="radio-label"><input type="radio" name="prof-type" value="객관식" onchange="updateProfForm()"><span class="dot"></span>객관식</label>
+              <label class="radio-label"><input type="radio" name="prof-type" value="OX" onchange="updateProfForm()"><span class="dot"></span>O·X</label>
+              <label class="radio-label"><input type="radio" name="prof-type" value="단답형" onchange="updateProfForm()"><span class="dot"></span>단답형</label>
+              <label class="radio-label"><input type="radio" name="prof-type" value="서술형" onchange="updateProfForm()"><span class="dot"></span>서술형</label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">문제 내용</label>
+            <textarea id="profQuestion" class="form-textarea" placeholder="문제를 입력하세요"></textarea>
+          </div>
+          <div id="profChoicesForm" class="hidden">
+            <div class="form-group">
+              <label class="form-label">보기 4개</label>
+              <div class="choices-editor">
+                <input type="text" id="pch1" class="form-input" placeholder="① 보기 1">
+                <input type="text" id="pch2" class="form-input" placeholder="② 보기 2">
+                <input type="text" id="pch3" class="form-input" placeholder="③ 보기 3">
+                <input type="text" id="pch4" class="form-input" placeholder="④ 보기 4">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">정답</label>
+              <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="prof-mcq-ans" value="1"><span class="dot"></span>①</label>
+                <label class="radio-label"><input type="radio" name="prof-mcq-ans" value="2"><span class="dot"></span>②</label>
+                <label class="radio-label"><input type="radio" name="prof-mcq-ans" value="3"><span class="dot"></span>③</label>
+                <label class="radio-label"><input type="radio" name="prof-mcq-ans" value="4"><span class="dot"></span>④</label>
+              </div>
+            </div>
+          </div>
+          <div id="profOxForm" class="hidden">
+            <div class="form-group">
+              <label class="form-label">정답</label>
+              <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="prof-ox-ans" value="O"><span class="dot"></span>O</label>
+                <label class="radio-label"><input type="radio" name="prof-ox-ans" value="X"><span class="dot"></span>X</label>
+              </div>
+            </div>
+          </div>
+          <div id="profShortForm" class="hidden">
+            <div class="form-group">
+              <label class="form-label">모범답안</label>
+              <textarea id="profAnswer" class="form-textarea" placeholder="모범답안"></textarea>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-full mt-8" onclick="addProfQuestion()">교수자 문제 추가</button>
+        </div>
+      </div>
+
+      <!-- 탭B: 퀴즈 업로드 -->
+      <div id="atab-publish" class="admin-panel">
+        <div class="card">
+          <div class="card-title"><span class="icon">📤</span> 퀴즈 게시</div>
+          <div class="form-group">
+            <label class="form-label">주차</label>
+            <select id="publishWeek" class="form-select">
+              <option value="">-- 주차 선택 --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">분반</label>
+            <div class="radio-group">
+              <label class="radio-label"><input type="radio" name="publish-class" value="A"><span class="dot"></span>A반</label>
+              <label class="radio-label"><input type="radio" name="publish-class" value="B"><span class="dot"></span>B반</label>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-full" onclick="loadQuizPreview()">미리보기</button>
+          <div id="quizPreviewList" style="margin-top:16px"></div>
+          <div id="publishBtnWrap" class="hidden mt-12">
+            <button class="btn btn-primary btn-full" id="publishBtn" onclick="publishQuiz()">🚀 퀴즈 게시</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 탭C: 결과 확인 -->
+      <div id="atab-results" class="admin-panel">
+        <div class="card">
+          <div class="card-title"><span class="icon">📊</span> 퀴즈 결과</div>
+          <div class="flex gap-8 items-center" style="margin-bottom:14px">
+            <select id="resultWeek" class="form-select">
+              <option value="">전체 주차</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="loadAdminResults()">조회</button>
+            <button class="btn btn-secondary btn-sm" onclick="downloadCSV()">CSV</button>
+          </div>
+          <div id="adminResultsList"></div>
+        </div>
+      </div>
+
+      <!-- 탭D: 기한 설정 -->
+      <div id="atab-deadline" class="admin-panel">
+        <div class="card">
+          <div class="card-title"><span class="icon">⏰</span> 주차별 기한 설정</div>
+          <div id="deadlineSettingsList"></div>
+          <button class="btn btn-secondary btn-sm mt-8" onclick="loadDeadlineSettings()">🔄 새로고침</button>
+        </div>
+      </div>
+
+    </div><!-- /adminDashboard -->
+  </div><!-- /adminView -->
+
+</main>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <span>© 2025 @slp_girin · 조음음운장애 학습 퀴즈</span>
+  &nbsp;|&nbsp;
+  <a href="#" onclick="showAdminView();return false;">관리자 로그인</a>
+</footer>
+
+<!-- ===== SPINNER ===== -->
+<div class="spinner-overlay" id="spinnerOverlay"><div class="spinner"></div></div>
+
+<!-- ===== TOAST CONTAINER ===== -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// =============================================
+// CONFIG — GAS 배포 URL을 여기에 입력하세요
+// =============================================
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwR1rxyuvh83mxnzCuNJbhb1J8661Ra7DDLgkYHtcO7ex_CZhXT3H3wfmFFSPNT28UQNA/exec";
+
+// =============================================
+// Global State
+// =============================================
+let deadlinesCache = [];
+let adminPassword = "";
+let quizData = [];
+let quizAnswers = [];
+let currentQuestion = 0;
+let quizUser = {};
+let adminResultsCache = [];
+
+// =============================================
+// Init
+// =============================================
+document.addEventListener("DOMContentLoaded", () => {
+  if (!GAS_URL) {
+    document.getElementById("setupWarning").classList.remove("hidden");
+    document.getElementById("mainContent").classList.add("hidden");
+    return;
+  }
+  if (location.hash === "#admin") showAdminView();
+  else loadDeadlines();
+  populateWeekDropdowns();
+});
+
+function populateWeekDropdowns() {
+  const selects = ["sub-week","quiz-week","adminReviewWeek","profWeek","publishWeek","resultWeek"];
+  selects.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const hasAll = id === "adminReviewWeek" || id === "resultWeek";
+    if (!hasAll) el.innerHTML = '<option value="">-- 주차를 선택하세요 --</option>';
+    for (let w = 1; w <= 15; w++) {
+      const opt = document.createElement("option");
+      opt.value = w;
+      opt.textContent = `${w}주차`;
+      el.appendChild(opt);
+    }
+  });
+}
+
+// =============================================
+// API Call
+// =============================================
+async function api(params) {
+  showSpinner();
+  const url = new URL(GAS_URL);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) url.searchParams.append(k, v);
+  });
+  try {
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data.success && data.error) throw new Error(data.error);
+    return data;
+  } finally {
+    hideSpinner();
+  }
+}
+
+// =============================================
+// Deadlines
+// =============================================
+async function loadDeadlines() {
+  try {
+    const data = await api({ action: "getDeadlines" });
+    deadlinesCache = data.deadlines || [];
+    updateWeekDropdownWithDeadlines();
+    updateQuizWeekDropdown();
+  } catch (e) {
+    showToast(e.message, "error");
+  }
+}
+
+function updateWeekDropdownWithDeadlines() {
+  const sel = document.getElementById("sub-week");
+  if (!sel) return;
+  sel.innerHTML = '<option value="">-- 주차를 선택하세요 --</option>';
+  const now = new Date();
+  deadlinesCache.forEach(d => {
+    const opt = document.createElement("option");
+    opt.value = d.week;
+    const deadline = d.deadline_date ? new Date(d.deadline_date) : null;
+    const closed = !d.is_open || (deadline && now > deadline);
+    if (closed) {
+      opt.textContent = `${d.week}주차 (마감)`;
+      opt.disabled = true;
+    } else {
+      opt.textContent = `${d.week}주차${d.deadline_date ? ` (~${formatDate(d.deadline_date)})` : ''}`;
+    }
+    sel.appendChild(opt);
+  });
+}
+
+function updateQuizWeekDropdown() {
+  const cls = document.querySelector('input[name="quiz-class"]:checked')?.value;
+  const sel = document.getElementById("quiz-week");
+  if (!sel) return;
+  sel.innerHTML = '<option value="">-- 퀴즈가 있는 주차를 선택하세요 --</option>';
+  if (!cls) return;
+  deadlinesCache.filter(d => cls === 'A' ? d.hasQuizA : d.hasQuizB).forEach(d => {
+    const opt = document.createElement("option");
+    opt.value = d.week;
+    opt.textContent = `${d.week}주차`;
+    sel.appendChild(opt);
+  });
+}
+
+function formatDate(s) {
+  if (!s) return "";
+  const d = new Date(s);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+// =============================================
+// Tabs
+// =============================================
+function switchTab(tab) {
+  document.querySelectorAll("#studentView .tab-panel").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll("#studentView .tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById(`tab-${tab}`).classList.add("active");
+  event.currentTarget.classList.add("active");
+  if (tab === "status" || tab === "quiz") loadDeadlines();
+}
+
+function switchAdminTab(tab) {
+  document.querySelectorAll(".admin-panel").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll("#adminDashboard .tab-bar .tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById(`atab-${tab}`).classList.add("active");
+  event.currentTarget.classList.add("active");
+  if (tab === "deadline") loadDeadlineSettings();
+}
+
+// =============================================
+// Tab1: Submit Question
+// =============================================
+function updateQuestionForm() {
+  const type = document.querySelector('input[name="sub-type"]:checked')?.value;
+  if (!type) return;
+  document.getElementById("questionForm").classList.remove("hidden");
+  document.getElementById("choicesForm").classList.add("hidden");
+  document.getElementById("oxForm").classList.add("hidden");
+  document.getElementById("shortForm").classList.add("hidden");
+  if (type === "객관식") document.getElementById("choicesForm").classList.remove("hidden");
+  else if (type === "OX") document.getElementById("oxForm").classList.remove("hidden");
+  else document.getElementById("shortForm").classList.remove("hidden");
+}
+
+async function submitQuestion() {
+  const name = document.getElementById("sub-name").value.trim();
+  const sid = document.getElementById("sub-sid").value.trim();
+  const cls = document.querySelector('input[name="sub-class"]:checked')?.value;
+  const week = document.getElementById("sub-week").value;
+  const type = document.querySelector('input[name="sub-type"]:checked')?.value;
+  const question = document.getElementById("sub-question")?.value.trim();
+
+  if (!name || !sid) return showToast("이름과 학번을 입력해주세요.", "error");
+  if (!cls) return showToast("분반을 선택해주세요.", "error");
+  if (!week) return showToast("주차를 선택해주세요.", "error");
+  if (!type) return showToast("문제 유형을 선택해주세요.", "error");
+  if (!question) return showToast("문제 내용을 입력해주세요.", "error");
+
+  let choices = "";
+  let answer = "";
+
+  if (type === "객관식") {
+    const ch = [1,2,3,4].map(i => document.getElementById(`ch${i}`).value.trim());
+    if (ch.some(c => !c)) return showToast("보기 4개를 모두 입력해주세요.", "error");
+    choices = ch.join("|");
+    answer = document.querySelector('input[name="sub-mcq-ans"]:checked')?.value;
+    if (!answer) return showToast("정답을 선택해주세요.", "error");
+  } else if (type === "OX") {
+    answer = document.querySelector('input[name="sub-ox-ans"]:checked')?.value;
+    if (!answer) return showToast("정답을 선택해주세요.", "error");
+  } else {
+    answer = document.getElementById("sub-answer-text")?.value.trim();
+    if (!answer) return showToast("모범답안을 입력해주세요.", "error");
+  }
+
+  try {
+    const data = await api({ action:"submitQuestion", name, student_id:sid, class:cls, week, question_type:type, question, choices, answer });
+    showToast(data.message, "success");
+    // Reset form
+    document.getElementById("sub-name").value = "";
+    document.getElementById("sub-sid").value = "";
+    document.getElementById("sub-question").value = "";
+    document.getElementById("questionForm").classList.add("hidden");
+    [1,2,3,4].forEach(i => { const el = document.getElementById(`ch${i}`); if(el) el.value=""; });
+    document.querySelectorAll('input[name="sub-class"], input[name="sub-type"], input[name="sub-mcq-ans"], input[name="sub-ox-ans"]').forEach(r => r.checked = false);
+    document.getElementById("sub-week").value = "";
+  } catch(e) {
+    showToast(e.message, "error");
+  }
+}
+
+// =============================================
+// Tab2: Status
+// =============================================
+async function loadStatus() {
+  const name = document.getElementById("st-name").value.trim();
+  const sid  = document.getElementById("st-sid").value.trim();
+  const cls  = document.querySelector('input[name="st-class"]:checked')?.value;
+  if (!name || !sid) return showToast("이름과 학번을 입력해주세요.", "error");
+  if (!cls) return showToast("분반을 선택해주세요.", "error");
+
+  try {
+    const data = await api({ action:"getSubmissionStatus", name, student_id:sid, class:cls });
+
+    // 15주 전부 not_submitted → 입력 정보가 잘못된 것으로 간주
+    const hasAnySubmission = data.status.some(s => s.state === "submitted");
+    if (!hasAnySubmission) {
+      document.getElementById("statusResult").classList.add("hidden");
+      showToast("입력하신 정보를 다시 확인해주세요.", "error");
+      return;
+    }
+
+    renderSubmissionGrid(data.status);
+    renderQuizGrid(data.status, cls);
+    document.getElementById("statusResult").classList.remove("hidden");
+  } catch(e) {
+    showToast(e.message, "error");
+  }
+}
+
+// 분반을 바꿨을 때, 이미 조회 결과가 표시 중이면 자동으로 재조회
+function reloadStatusIfReady() {
+  if (!document.getElementById("statusResult").classList.contains("hidden")) {
+    loadStatus();
+  }
+}
+
+function renderSubmissionGrid(statusList) {
+  const grid = document.getElementById("submissionGrid");
+  grid.innerHTML = "";
+  statusList.forEach(s => {
+    const card = document.createElement("div");
+    let cardCls, icon, label;
+    if (s.state === "submitted") {
+      cardCls = "week-card submitted"; icon = "✅"; label = "제출완료";
+    } else if (s.state === "not_submitted") {
+      cardCls = "week-card not-submitted"; icon = "🟡"; label = "미제출";
+    } else {
+      cardCls = "week-card closed"; icon = "⬜"; label = "마감";
+    }
+    card.className = cardCls;
+    card.innerHTML = `<div class="week-num">${s.week}주차</div><div class="week-status">${icon} ${label}</div>`;
+    grid.appendChild(card);
+  });
+}
+
+function renderQuizGrid(statusList, cls) {
+  const grid = document.getElementById("quizGrid");
+  grid.innerHTML = "";
+  statusList.forEach(s => {
+    const hasQuiz = cls === 'A' ? s.hasQuizA : s.hasQuizB;
+    const card = document.createElement("div");
+    let cardCls, icon, label;
+    if (!hasQuiz) {
+      cardCls = "week-card closed"; icon = "⬜"; label = "퀴즈없음";
+    } else if (s.quizDone) {
+      cardCls = "week-card submitted"; icon = "✅"; label = `${s.score}/${s.total}점`;
+    } else {
+      cardCls = "week-card not-submitted"; icon = "🟡"; label = "미응시";
+    }
+    card.className = cardCls;
+    card.innerHTML = `<div class="week-num">${s.week}주차</div><div class="week-status">${icon} ${label}</div>`;
+    grid.appendChild(card);
+  });
+}
+
+// =============================================
+// Tab3: Quiz
+// =============================================
+async function startQuiz() {
+  const name = document.getElementById("quiz-name").value.trim();
+  const sid = document.getElementById("quiz-sid").value.trim();
+  const cls = document.querySelector('input[name="quiz-class"]:checked')?.value;
+  const week = document.getElementById("quiz-week").value;
+
+  if (!name || !sid) return showToast("이름과 학번을 입력해주세요.", "error");
+  if (!cls) return showToast("분반을 선택해주세요.", "error");
+  if (!week) return showToast("주차를 선택해주세요.", "error");
+
+  try {
+    const data = await api({ action:"getQuiz", week, class: cls });
+    quizData = data.quizzes;
+    quizAnswers = new Array(quizData.length).fill(null);
+    currentQuestion = 0;
+    quizUser = { name, sid, cls, week };
+    document.getElementById("quizEntryForm").classList.add("hidden");
+    document.getElementById("quizScreen").classList.remove("hidden");
+    renderQuestion();
+  } catch(e) {
+    showToast(e.message, "error");
+  }
+}
+
+function renderQuestion() {
+  const q = quizData[currentQuestion];
+  const total = quizData.length;
+  const progress = ((currentQuestion + 1) / total) * 100;
+  document.getElementById("quizProgressBar").style.width = progress + "%";
+  document.getElementById("quizProgressText").textContent = `${currentQuestion+1}/${total}`;
+
+  const prevBtn = document.getElementById("prevBtn");
+  const nextBtn = document.getElementById("nextBtn");
+  prevBtn.disabled = currentQuestion === 0;
+  nextBtn.textContent = currentQuestion === total - 1 ? "제출 ✓" : "다음 ▶";
+
+  let html = `<div class="question-card">
+    <span class="question-type-badge">${q.question_type}</span>
+    <div class="question-text">${escHtml(q.question)}</div>
+  </div>`;
+
+  const saved = quizAnswers[currentQuestion];
+
+  if (q.question_type === "객관식") {
+    const choices = q.choices.split("|");
+    html += `<ul class="choices-list">`;
+    choices.forEach((ch, i) => {
+      const nums = ["①","②","③","④"];
+      const checked = saved === String(i+1) ? "checked" : "";
+      html += `<li class="choice-item"><label>
+        <input type="radio" name="qans" value="${i+1}" ${checked}>
+        <span class="choice-num">${nums[i]}</span>
+        <span>${escHtml(ch)}</span>
+      </label></li>`;
+    });
+    html += `</ul>`;
+  } else if (q.question_type === "OX") {
+    const oSel = saved === "O" ? "selected-O" : "";
+    const xSel = saved === "X" ? "selected-X" : "";
+    html += `<div class="ox-buttons">
+      <button class="ox-btn ${oSel}" id="oxO" onclick="selectOX('O')">O</button>
+      <button class="ox-btn ${xSel}" id="oxX" onclick="selectOX('X')">X</button>
+    </div>`;
+  } else {
+    html += `<div class="form-group mt-8">
+      <label class="form-label">내 답안</label>
+      <textarea class="form-textarea" id="openAnswer" placeholder="답을 입력하세요">${saved || ""}</textarea>
+    </div>`;
+  }
+
+  document.getElementById("questionDisplay").innerHTML = html;
+
+  if (q.question_type === "객관식") {
+    document.querySelectorAll('input[name="qans"]').forEach(r => {
+      r.addEventListener("change", () => { quizAnswers[currentQuestion] = r.value; });
+    });
+  }
+}
+
+function selectOX(val) {
+  quizAnswers[currentQuestion] = val;
+  document.getElementById("oxO").className = "ox-btn" + (val === "O" ? " selected-O" : "");
+  document.getElementById("oxX").className = "ox-btn" + (val === "X" ? " selected-X" : "");
+}
+
+function saveCurrentAnswer() {
+  const q = quizData[currentQuestion];
+  if (q.question_type === "단답형" || q.question_type === "서술형") {
+    const el = document.getElementById("openAnswer");
+    if (el) quizAnswers[currentQuestion] = el.value.trim();
+  }
+}
+
+function prevQuestion() {
+  saveCurrentAnswer();
+  if (currentQuestion > 0) { currentQuestion--; renderQuestion(); }
+}
+
+function nextQuestion() {
+  saveCurrentAnswer();
+  if (currentQuestion < quizData.length - 1) {
+    currentQuestion++;
+    renderQuestion();
+  } else {
+    submitQuiz();
+  }
+}
+
+async function submitQuiz() {
+  // Calculate score
+  let score = 0;
+  const resultItems = quizData.map((q, i) => {
+    const ans = quizAnswers[i];
+    let correct = false;
+    let pending = false;
+    if (q.question_type === "단답형" || q.question_type === "서술형") {
+      pending = true;
+    } else {
+      correct = String(ans).trim().toLowerCase() === String(q.answer).trim().toLowerCase();
+      if (correct) score++;
+    }
+    return { question: q.question, question_type: q.question_type, my_answer: ans, correct_answer: q.answer, correct, pending };
+  });
+  const autoTotal = quizData.filter(q => q.question_type !== "단답형" && q.question_type !== "서술형").length;
+
+  const answersJson = JSON.stringify(resultItems);
+
+  try {
+    await api({
+      action: "submitResult",
+      name: quizUser.name,
+      student_id: quizUser.sid,
+      class: quizUser.cls,
+      week: quizUser.week,
+      score,
+      total: autoTotal,
+      answers_json: answersJson
+    });
+  } catch(e) {
+    showToast("결과 저장 중 오류: " + e.message, "error");
+  }
+
+  // Show result
+  document.getElementById("quizScreen").classList.add("hidden");
+  document.getElementById("quizResult").classList.remove("hidden");
+  document.getElementById("scoreNum").textContent = `${score}/${autoTotal}`;
+
+  let html = "";
+  resultItems.forEach((r, i) => {
+    let icon = r.pending ? "❓" : (r.correct ? "✅" : "❌");
+    let ansHtml = "";
+    if (r.pending) {
+      ansHtml = `<span class="result-pending">교수자 확인 중</span>`;
+    } else if (r.correct) {
+      ansHtml = `<span class="result-correct">정답: ${escHtml(r.correct_answer)}</span>`;
+    } else {
+      ansHtml = `<span class="result-wrong">내 답: ${escHtml(r.my_answer||"(미응답)")} → 정답: ${escHtml(r.correct_answer)}</span>`;
+    }
+    html += `<div class="result-item">
+      <div class="result-icon">${icon}</div>
+      <div class="result-details">
+        <div class="result-q">${i+1}. ${escHtml(r.question)}</div>
+        <div class="result-ans">${ansHtml}</div>
+      </div>
+    </div>`;
+  });
+  document.getElementById("resultDetails").innerHTML = html;
+}
+
+function resetQuiz() {
+  quizData = []; quizAnswers = []; currentQuestion = 0; quizUser = {};
+  document.getElementById("quizResult").classList.add("hidden");
+  document.getElementById("quizScreen").classList.add("hidden");
+  document.getElementById("quizEntryForm").classList.remove("hidden");
+  loadDeadlines();
+}
+
+// =============================================
+// Admin
+// =============================================
+function showAdminView() {
+  document.getElementById("studentView").classList.add("hidden");
+  document.getElementById("adminView").classList.remove("hidden");
+  document.getElementById("adminDashboard").classList.add("hidden");
+  document.getElementById("adminLoginForm").classList.remove("hidden");
+  location.hash = "admin";
+}
+
+function showStudentView() {
+  document.getElementById("adminView").classList.add("hidden");
+  document.getElementById("studentView").classList.remove("hidden");
+  location.hash = "";
+}
+
+async function adminLogin() {
+  const pw = document.getElementById("adminPw").value;
+  if (!pw) return showToast("비밀번호를 입력해주세요.", "error");
+  try {
+    await api({ action:"adminLogin", password:pw });
+    adminPassword = pw;
+    document.getElementById("adminLoginForm").classList.add("hidden");
+    document.getElementById("adminDashboard").classList.remove("hidden");
+    populateAdminWeekDropdowns();
+    loadDeadlineSettings();
+    showToast("관리자로 로그인했습니다.", "success");
+  } catch(e) {
+    showToast(e.message, "error");
+  }
+}
+
+function adminLogout() {
+  adminPassword = "";
+  document.getElementById("adminDashboard").classList.add("hidden");
+  document.getElementById("adminLoginForm").classList.remove("hidden");
+  document.getElementById("adminPw").value = "";
+}
+
+function populateAdminWeekDropdowns() {
+  ["adminReviewWeek","profWeek","publishWeek","resultWeek"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const hasAll = id === "adminReviewWeek" || id === "resultWeek";
+    el.innerHTML = hasAll ? '<option value="">전체 주차</option>' : '<option value="">-- 주차 선택 --</option>';
+    for (let w = 1; w <= 15; w++) {
+      const opt = document.createElement("option");
+      opt.value = w;
+      opt.textContent = `${w}주차`;
+      el.appendChild(opt);
+    }
+  });
+}
+
+async function loadAdminSubmissions() {
+  const week = document.getElementById("adminReviewWeek").value;
+  try {
+    const data = await api({ action:"adminGetSubmissions", password:adminPassword, week });
+    renderAdminSubmissions(data.submissions);
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+function renderAdminSubmissions(list) {
+  const el = document.getElementById("adminSubmissionsList");
+  if (!list.length) { el.innerHTML = '<p style="color:var(--gray-500);text-align:center;padding:20px">제출된 문제가 없습니다.</p>'; return; }
+
+  el.innerHTML = list.map(s => {
+    const statusBadge = s.status === "approved"
+      ? '<span class="badge badge-success">✅ 승인</span>'
+      : s.status === "rejected"
+      ? '<span class="badge badge-danger">❌ 반려</span>'
+      : '<span class="badge badge-warning">⏳ 대기</span>';
+
+    const choicesHtml = s.question_type === "객관식" ? `
+      <div class="form-group"><label class="form-label">보기 (|로 구분)</label>
+      <input type="text" class="form-input" id="s-choices-${s._row}" value="${escAttr(s.choices||'')}"></div>` : '';
+
+    return `<div class="submission-item">
+      <div class="submission-header">
+        <span class="submission-meta">${s.week}주차 · ${s.name} (${s.student_id}) · ${s.class}반 · <strong>${s.question_type}</strong></span>
+        ${statusBadge}
+      </div>
+      <div class="form-group">
+        <label class="form-label">문제</label>
+        <textarea class="form-textarea" id="s-q-${s._row}" style="min-height:60px">${escHtml(s.question||'')}</textarea>
+      </div>
+      ${choicesHtml}
+      <div class="form-group">
+        <label class="form-label">정답</label>
+        <input type="text" class="form-input" id="s-ans-${s._row}" value="${escAttr(s.answer||'')}">
+      </div>
+      <div class="submission-actions">
+        <button class="btn btn-success btn-sm" onclick="updateSubmission(${s._row},'approved')">✅ 승인</button>
+        <button class="btn btn-danger btn-sm" onclick="updateSubmission(${s._row},'rejected')">❌ 반려</button>
+        <button class="btn btn-secondary btn-sm" onclick="saveSubmissionEdit(${s._row})">💾 저장</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function updateSubmission(row, status) {
+  const question = document.getElementById(`s-q-${row}`)?.value;
+  const choices = document.getElementById(`s-choices-${row}`)?.value;
+  const answer = document.getElementById(`s-ans-${row}`)?.value;
+  try {
+    await api({ action:"adminUpdateSubmission", password:adminPassword, row, status, question, choices, answer });
+    showToast(status === "approved" ? "승인되었습니다." : "반려되었습니다.", "success");
+    loadAdminSubmissions();
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+async function saveSubmissionEdit(row) {
+  const question = document.getElementById(`s-q-${row}`)?.value;
+  const choices = document.getElementById(`s-choices-${row}`)?.value;
+  const answer = document.getElementById(`s-ans-${row}`)?.value;
+  try {
+    await api({ action:"adminUpdateSubmission", password:adminPassword, row, question, choices, answer });
+    showToast("저장되었습니다.", "success");
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+function updateProfForm() {
+  const type = document.querySelector('input[name="prof-type"]:checked')?.value;
+  document.getElementById("profChoicesForm").classList.add("hidden");
+  document.getElementById("profOxForm").classList.add("hidden");
+  document.getElementById("profShortForm").classList.add("hidden");
+  if (type === "객관식") document.getElementById("profChoicesForm").classList.remove("hidden");
+  else if (type === "OX") document.getElementById("profOxForm").classList.remove("hidden");
+  else if (type) document.getElementById("profShortForm").classList.remove("hidden");
+}
+
+async function addProfQuestion() {
+  const week = document.getElementById("profWeek").value;
+  const type = document.querySelector('input[name="prof-type"]:checked')?.value;
+  const question = document.getElementById("profQuestion").value.trim();
+  if (!week || !type || !question) return showToast("주차, 유형, 문제 내용을 입력해주세요.", "error");
+
+  let choices = "";
+  let answer = "";
+  if (type === "객관식") {
+    const ch = [1,2,3,4].map(i => document.getElementById(`pch${i}`).value.trim());
+    if (ch.some(c => !c)) return showToast("보기 4개를 모두 입력해주세요.", "error");
+    choices = ch.join("|");
+    answer = document.querySelector('input[name="prof-mcq-ans"]:checked')?.value;
+    if (!answer) return showToast("정답을 선택해주세요.", "error");
+  } else if (type === "OX") {
+    answer = document.querySelector('input[name="prof-ox-ans"]:checked')?.value;
+    if (!answer) return showToast("정답을 선택해주세요.", "error");
+  } else {
+    answer = document.getElementById("profAnswer").value.trim();
+    if (!answer) return showToast("모범답안을 입력해주세요.", "error");
+  }
+
+  try {
+    await api({ action:"adminAddQuestion", password:adminPassword, week, question_type:type, question, choices, answer });
+    showToast("교수자 문제가 추가되었습니다.", "success");
+    document.getElementById("profQuestion").value = "";
+    [1,2,3,4].forEach(i => { const el=document.getElementById(`pch${i}`); if(el) el.value=""; });
+    const profAns = document.getElementById("profAnswer"); if(profAns) profAns.value="";
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+async function loadQuizPreview() {
+  const week = document.getElementById("publishWeek").value;
+  const cls  = document.querySelector('input[name="publish-class"]:checked')?.value;
+  if (!week) return showToast("주차를 선택해주세요.", "error");
+  if (!cls)  return showToast("분반을 선택해주세요.", "error");
+  try {
+    const data = await api({ action:"adminGetQuizPreview", password:adminPassword, week, class: cls });
+    const el = document.getElementById("quizPreviewList");
+    if (!data.questions.length) {
+      el.innerHTML = `<p style="color:var(--gray-500)">${cls}반에 승인된 문제가 없습니다.</p>`;
+      document.getElementById("publishBtnWrap").classList.add("hidden");
+      return;
+    }
+    el.innerHTML = data.questions.map((q,i) => `
+      <div style="padding:10px;background:var(--gray-50);border-radius:8px;margin-bottom:8px;font-size:0.9rem;">
+        <strong>${i+1}. [${q.question_type}]</strong> ${escHtml(q.question)}
+        <div style="margin-top:4px;color:var(--gray-600)">정답: ${escHtml(q.answer)} · 제출자: ${escHtml(q.name)}</div>
+      </div>`).join('');
+    document.getElementById("publishBtn").textContent = `🚀 ${week}주차 ${cls}반 퀴즈 게시`;
+    document.getElementById("publishBtnWrap").classList.remove("hidden");
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+async function publishQuiz() {
+  const week = document.getElementById("publishWeek").value;
+  const cls  = document.querySelector('input[name="publish-class"]:checked')?.value;
+  if (!week) return showToast("주차를 선택해주세요.", "error");
+  if (!cls)  return showToast("분반을 선택해주세요.", "error");
+  try {
+    const data = await api({ action:"adminPublishQuiz", password:adminPassword, week, class: cls });
+    showToast(data.message, "success");
+    document.getElementById("publishBtnWrap").classList.add("hidden");
+    document.getElementById("quizPreviewList").innerHTML = "";
+    loadDeadlines();
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+async function loadAdminResults() {
+  const week = document.getElementById("resultWeek").value;
+  try {
+    const data = await api({ action:"adminGetResults", password:adminPassword, week });
+    adminResultsCache = data.results;
+    renderAdminResults(data.results);
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+function renderAdminResults(list) {
+  const el = document.getElementById("adminResultsList");
+  if (!list.length) { el.innerHTML = '<p style="color:var(--gray-500);text-align:center;padding:20px">결과가 없습니다.</p>'; return; }
+
+  el.innerHTML = `
+    <div class="result-row result-row-header">
+      <span>이름/학번</span><span>분반·주차</span><span>점수</span><span>시간</span><span>상세</span>
+    </div>` +
+    list.map(r => `
+      <div class="result-row">
+        <span>${escHtml(r.name)}<br><small>${escHtml(r.student_id)}</small></span>
+        <span>${r.class}반 ${r.week}주</span>
+        <span>${r.score}/${r.total}</span>
+        <span style="font-size:0.72rem">${formatDate(r.timestamp)}</span>
+        <button class="btn btn-secondary btn-sm" onclick="showResultDetail(${r._row})">보기</button>
+      </div>`).join('');
+}
+
+function showResultDetail(row) {
+  const r = adminResultsCache.find(x => x._row === row);
+  if (!r) return;
+  let items;
+  try { items = JSON.parse(r.answers_json); } catch { items = []; }
+  if (!items.length) return showToast("상세 답안이 없습니다.", "info");
+
+  const html = items.map((it, i) => {
+    let statusHtml = it.pending
+      ? `<span class="result-pending">미채점</span>
+         <button class="btn btn-success btn-sm" onclick="gradeItem(${r._row},${i},'correct',this)">✅맞음</button>
+         <button class="btn btn-danger btn-sm" onclick="gradeItem(${r._row},${i},'wrong',this)">❌틀림</button>`
+      : (it.correct ? '<span class="result-correct">✅ 정답</span>' : '<span class="result-wrong">❌ 오답</span>');
+    return `<div class="result-item">
+      <div class="result-details">
+        <div class="result-q">${i+1}. [${escHtml(it.question_type)}] ${escHtml(it.question)}</div>
+        <div class="result-ans">내 답: <strong>${escHtml(it.my_answer||'(없음)')}</strong> / 정답: ${escHtml(it.correct_answer)}</div>
+        <div class="mt-8">${statusHtml}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const modal = document.createElement("div");
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;overflow-y:auto;padding:20px";
+  modal.innerHTML = `<div style="max-width:560px;margin:0 auto;background:white;border-radius:12px;padding:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <strong>${escHtml(r.name)} (${r.week}주차) 상세 답안</strong>
+      <button class="btn btn-secondary btn-sm" onclick="this.closest('[style]').remove()">닫기</button>
+    </div>
+    <div id="resultDetailInner">${html}</div>
+  </div>`;
+  document.body.appendChild(modal);
+
+  modal._row = r._row;
+  modal._items = items;
+}
+
+async function gradeItem(row, idx, result, btn) {
+  const modal = btn.closest("[style*='fixed']");
+  const items = modal._items;
+  items[idx].correct = result === "correct";
+  items[idx].pending = false;
+
+  const scored = items.filter(it => !it.pending && it.correct).length;
+  const newScore = scored;
+
+  try {
+    await api({
+      action: "adminGradeResult",
+      password: adminPassword,
+      row,
+      answers_json: JSON.stringify(items),
+      score: newScore
+    });
+    showToast("채점 결과가 저장되었습니다.", "success");
+    const inner = document.getElementById("resultDetailInner");
+    if (inner) {
+      const item = inner.querySelectorAll(".result-item")[idx];
+      if (item) {
+        const last = item.querySelector(".mt-8");
+        if (last) last.innerHTML = result === "correct"
+          ? '<span class="result-correct">✅ 정답</span>'
+          : '<span class="result-wrong">❌ 오답</span>';
+      }
+    }
+    adminResultsCache = adminResultsCache.map(r2 => {
+      if (r2._row === row) { return { ...r2, score: newScore, answers_json: JSON.stringify(items) }; }
+      return r2;
+    });
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+function downloadCSV() {
+  if (!adminResultsCache.length) return showToast("결과 데이터가 없습니다.", "info");
+  const headers = ["타임스탬프","이름","학번","분반","주차","점수","전체"];
+  const rows = adminResultsCache.map(r => [r.timestamp,r.name,r.student_id,r.class,r.week,r.score,r.total]);
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob(["﻿"+csv], { type:"text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `quiz_results_${Date.now()}.csv`;
+  a.click();
+}
+
+// ===== Deadline Settings =====
+async function loadDeadlineSettings() {
+  try {
+    const data = await api({ action:"getDeadlines" });
+    deadlinesCache = data.deadlines || [];
+    renderDeadlineSettings();
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+function renderDeadlineSettings() {
+  const el = document.getElementById("deadlineSettingsList");
+  if (!el) return;
+  el.innerHTML = deadlinesCache.map(d => {
+    const dtVal = d.deadline_date ? d.deadline_date.replace(" ","T").substring(0,16) : "";
+    return `<div class="deadline-row">
+      <span style="font-weight:600;font-size:0.85rem">${d.week}주차</span>
+      <input type="datetime-local" class="form-input" id="dl-${d.week}" value="${dtVal}" style="font-size:0.82rem">
+      <button class="btn btn-primary btn-sm" onclick="saveDeadline(${d.week})">저장</button>
+    </div>`;
+  }).join('') || '<p style="color:var(--gray-500)">기한 정보가 없습니다.</p>';
+}
+
+async function saveDeadline(week) {
+  const val = document.getElementById(`dl-${week}`)?.value;
+  if (!val) return showToast("날짜를 입력해주세요.", "error");
+  const deadline_date = val.replace("T"," ") + ":00";
+  try {
+    await api({ action:"adminSetDeadline", password:adminPassword, week, deadline_date, is_open:"true" });
+    showToast(`${week}주차 기한이 저장되었습니다.`, "success");
+    loadDeadlines();
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+// =============================================
+// UI Helpers
+// =============================================
+function showSpinner() { document.getElementById("spinnerOverlay").classList.add("active"); }
+function hideSpinner() { document.getElementById("spinnerOverlay").classList.remove("active"); }
+
+function showToast(msg, type = "info") {
+  const container = document.getElementById("toastContainer");
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  const icon = type === "success" ? "✅" : type === "error" ? "❌" : "ℹ️";
+  toast.innerHTML = `<span>${icon}</span><span>${escHtml(msg)}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3500);
+}
+
+function escHtml(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function escAttr(s) {
+  return String(s||"").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+</script>
+</body>
+</html>
