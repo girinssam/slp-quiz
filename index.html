@@ -66,38 +66,59 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --primary: #4ECDC4;
-  --primary-dark: #2C9B8A;
-  --primary-light: #E8F8F7;
-  --accent: #FF6B6B;
-  --success: #51CF66;
-  --warning: #FFD43B;
-  --danger: #FF6B6B;
-  --gray-50: #F8FAFB;
-  --gray-100: #F1F3F5;
-  --gray-200: #E9ECEF;
-  --gray-300: #DEE2E6;
-  --gray-400: #CED4DA;
-  --gray-500: #ADB5BD;
-  --gray-600: #868E96;
-  --gray-700: #495057;
-  --gray-800: #343A40;
-  --gray-900: #212529;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --shadow: 0 2px 12px rgba(0,0,0,0.08);
-  --shadow-md: 0 4px 24px rgba(0,0,0,0.12);
+  /* ── SLP Quiz Lab 디자인 토큰 ── */
+  --bg:#EDEFFA; --surface:#FFFFFF;
+  --primary:#5C5CE0; --primary-deep:#4A4AC4; --primary-soft:#E9EAFC;
+  --ink:#1E2246; --ink-2:#4A5074; --muted:#9AA0BE; --line:#EEF0F8;
+  --ok:#46B98E; --ok-soft:#E4F5EE;
+  --wait:#E8A33D; --wait-soft:#FBF0DF;
+  --bad:#E0698A; --bad-soft:#FBE8ED;
+  --off:#B9BED6;
+  --radius-xl:24px; --radius-lg:20px; --radius-md:14px;
+  --shadow:0 12px 34px rgba(48,55,120,.07);
+
+  /* ── 기존 클래스가 참조하는 이름 → 위 토큰으로 매핑 (레이아웃 구조는 그대로 유지) ── */
+  --primary-dark: var(--primary-deep);
+  --primary-light: var(--primary-soft);
+  --accent: var(--bad);
+  --success: var(--ok);
+  --warning: var(--wait);
+  --danger: var(--bad);
+  --gray-50: var(--bg);
+  --gray-100: var(--line);
+  --gray-200: #E3E6F5;
+  --gray-300: #D7DAEE;
+  --gray-400: var(--muted);
+  --gray-500: var(--muted);
+  --gray-600: var(--ink-2);
+  --gray-700: var(--ink-2);
+  --gray-800: var(--ink);
+  --gray-900: var(--ink);
+  --radius: var(--radius-xl);
+  --radius-sm: var(--radius-md);
+  --shadow-md: 0 16px 40px rgba(48,55,120,.10);
   --transition: 0.2s ease;
 }
 
 body {
-  font-family: 'Paperozi', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Pretendard', 'Paperozi', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 20px;
-  background: var(--gray-50);
-  color: var(--gray-800);
+  background: var(--bg);
+  color: var(--ink);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(92,92,224,0.16), transparent 45%),
+    radial-gradient(circle at 88% 92%, rgba(224,105,138,0.12), transparent 45%);
+  pointer-events: none;
 }
 
 /* ===== Header ===== */
@@ -209,7 +230,7 @@ body {
   gap: 10px;
   padding: 12px 20px;
   border: 1.5px solid var(--gray-200);
-  border-radius: 30px;
+  border-radius: 999px;
   cursor: pointer;
   font-size: 18px;
   transition: var(--transition);
@@ -241,7 +262,7 @@ body {
   justify-content: center;
   gap: 6px;
   padding: 18px 28px;
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   border: none;
   font-size: 20px;
   font-weight: 700;
@@ -292,7 +313,7 @@ body {
   margin-top: 12px;
 }
 .week-card {
-  background: white;
+  background: var(--surface);
   border: 1.5px solid var(--gray-200);
   border-radius: var(--radius-sm);
   padding: 14px 8px;
@@ -301,10 +322,11 @@ body {
 }
 .week-card .week-num { font-size: 0.95rem; color: var(--gray-500); }
 .week-card .week-status { font-size: 0.85rem; font-weight: 700; margin-top: 6px; line-height: 1.4; }
-.week-card.submitted { border-color: var(--success); background: #F0FBF1; }
-.week-card.submitted .week-status { color: #2B8A3E; }
-.week-card.not-submitted { border-color: #FFC94D; background: #FFFBF0; }
-.week-card.not-submitted .week-status { color: #E67700; }
+.week-card .week-status::before { content: "●"; margin-right: 4px; font-size: 0.7em; }
+.week-card.submitted { border-color: var(--ok); background: var(--ok-soft); }
+.week-card.submitted .week-status { color: var(--ok); }
+.week-card.not-submitted { border-color: var(--wait); background: var(--wait-soft); }
+.week-card.not-submitted .week-status { color: var(--wait); }
 .week-card.closed { border-color: var(--gray-300); background: var(--gray-50); }
 .week-card.closed .week-status { color: var(--gray-500); }
 .week-card.has-quiz { border-color: var(--primary); background: var(--primary-light); }
@@ -536,9 +558,10 @@ body {
   align-items: center;
   gap: 8px;
 }
-.toast-success { background: #2B8A3E; }
-.toast-error { background: #C92A2A; }
-.toast-info { background: var(--primary-dark); }
+.toast-success { background: var(--ok); }
+.toast-error { background: var(--bad); }
+.toast-info { background: var(--primary-deep); }
+.toast-dot { width: 7px; height: 7px; border-radius: 50%; background: white; flex-shrink: 0; }
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
@@ -612,15 +635,48 @@ body {
 
 .choices-editor { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 
+/* ===== 숫자 표시 요소: 자릿수 흔들림 방지 ===== */
+.week-num, .week-status, .score-num, .stat-num, .result-row, .progress-text,
+.qstat-pct, .submission-meta, .badge, .chip {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 상태 칩 (이모지 대신 색 점 + 텍스트) ===== */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chip::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: currentColor;
+}
+.chip-ok   { background: var(--ok-soft);   color: var(--ok); }
+.chip-wait { background: var(--wait-soft); color: var(--wait); }
+.chip-off  { background: var(--line);      color: var(--off); }
+.chip-bad  { background: var(--bad-soft);  color: var(--bad); }
+
+@media (max-width: 640px) {
+  .week-grid { grid-template-columns: 1fr; }
+  .stats-summary { grid-template-columns: 1fr; }
+  .id-fields { flex-direction: column; }
+}
+
 @media (max-width: 480px) {
-  .week-grid { grid-template-columns: repeat(3, 1fr); }
   .result-row { grid-template-columns: 1fr 1fr; font-size: 14px; }
   .header h1 { font-size: 1.1rem; }
   .tab-btn { font-size: 15px; padding: 12px 4px; }
   .card { padding: 20px; }
   .btn { padding: 16px 20px; font-size: 18px; }
   .radio-label { padding: 10px 14px; font-size: 16px; }
-  .stats-summary { grid-template-columns: repeat(2, 1fr); }
   .qstat-label { flex-basis: 30%; }
 }
 </style>
@@ -636,7 +692,7 @@ body {
 <!-- ===== SETUP WARNING (shown if GAS_URL not set) ===== -->
 <div id="setupWarning" class="container hidden">
   <div class="setup-warning">
-    <h3>⚙️ 설정이 필요합니다</h3>
+    <h3>설정이 필요합니다</h3>
     <p>index.html 상단의 <code>GAS_URL</code>에 Google Apps Script 배포 URL을 입력해주세요.</p>
   </div>
 </div>
@@ -647,15 +703,15 @@ body {
   <!-- Student Tabs -->
   <div id="studentView">
     <div class="tab-bar">
-      <button class="tab-btn active" onclick="switchTab('submit')">📝 문제 제출</button>
-      <button class="tab-btn" onclick="switchTab('quiz')">🧩 퀴즈 풀기</button>
-      <button class="tab-btn" onclick="switchTab('status')">📊 제출 현황</button>
+      <button class="tab-btn active" onclick="switchTab('submit')">문제 제출</button>
+      <button class="tab-btn" onclick="switchTab('quiz')">퀴즈 풀기</button>
+      <button class="tab-btn" onclick="switchTab('status')">제출 현황</button>
     </div>
 
     <!-- Tab 1: 문제 제출 -->
     <div id="tab-submit" class="tab-panel active">
       <div class="card">
-        <div class="card-title"><span class="icon">✏️</span> 문제 제출</div>
+        <div class="card-title">문제 제출</div>
 
         <div class="form-group">
           <label class="form-label">이름</label>
@@ -751,7 +807,7 @@ body {
     <div id="tab-quiz" class="tab-panel">
       <!-- 입장 폼 -->
       <div id="quizEntryForm" class="card">
-        <div class="card-title"><span class="icon">🧩</span> 퀴즈 풀기</div>
+        <div class="card-title">퀴즈 풀기</div>
         <div class="form-group">
           <label class="form-label">이름</label>
           <input type="text" id="quiz-name" class="form-input" placeholder="이름을 입력하세요">
@@ -773,7 +829,7 @@ body {
             <option value="">-- 분반 선택 후 주차를 선택하세요 --</option>
           </select>
         </div>
-        <button class="btn btn-primary btn-full mt-8" id="startQuizBtn" onclick="startQuiz()">퀴즈 시작 🚀</button>
+        <button class="btn btn-primary btn-full mt-8" id="startQuizBtn" onclick="startQuiz()">퀴즈 시작</button>
       </div>
 
       <!-- 퀴즈 진행 화면 -->
@@ -803,7 +859,7 @@ body {
     <!-- Tab 3: 제출 현황 -->
     <div id="tab-status" class="tab-panel">
       <div class="card">
-        <div class="card-title"><span class="icon">🔍</span> 제출 현황 조회</div>
+        <div class="card-title">제출 현황 조회</div>
         <div class="flex gap-8" style="margin-bottom:14px">
           <input type="text" id="st-name" class="form-input" placeholder="이름">
           <input type="text" id="st-sid" class="form-input" placeholder="학번">
@@ -819,21 +875,21 @@ body {
       </div>
       <div id="statusResult" class="hidden">
         <div class="card">
-          <div class="card-title"><span class="icon">📋</span> 문제 제출 현황</div>
+          <div class="card-title">문제 제출 현황</div>
           <div class="week-grid" id="submissionGrid"></div>
-          <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; font-size:0.9rem;">
-            <span>✅ 제출완료</span>
-            <span>🟡 미제출</span>
-            <span>⬜ 마감</span>
+          <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:10px;">
+            <span class="chip chip-ok">제출완료</span>
+            <span class="chip chip-wait">미제출</span>
+            <span class="chip chip-off">마감</span>
           </div>
         </div>
         <div class="card">
-          <div class="card-title"><span class="icon">🧩</span> 퀴즈 응시 현황</div>
+          <div class="card-title">퀴즈 응시 현황</div>
           <div class="week-grid" id="quizGrid"></div>
-          <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; font-size:0.9rem;">
-            <span>✅ 응시완료 (재응시 가능)</span>
-            <span>🟡 미응시</span>
-            <span>⬜ 퀴즈없음/응시마감</span>
+          <div style="margin-top:16px; display:flex; flex-wrap:wrap; gap:10px;">
+            <span class="chip chip-ok">응시완료 (재응시 가능)</span>
+            <span class="chip chip-wait">미응시</span>
+            <span class="chip chip-off">퀴즈없음/응시마감</span>
           </div>
         </div>
       </div>
@@ -844,7 +900,7 @@ body {
   <div id="adminView" class="hidden">
     <!-- 로그인 폼 -->
     <div id="adminLoginForm" class="card">
-      <div class="card-title"><span class="icon">🔐</span> 관리자 로그인</div>
+      <div class="card-title">관리자 로그인</div>
       <div class="form-group">
         <label class="form-label">비밀번호</label>
         <input type="password" id="adminPw" class="form-input" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')adminLogin()">
@@ -858,25 +914,25 @@ body {
     <!-- 관리자 대시보드 -->
     <div id="adminDashboard" class="hidden">
       <div class="flex justify-between items-center" style="margin-bottom:16px">
-        <span style="font-weight:700;font-size:1rem;">🛠️ 관리자 패널</span>
+        <span style="font-weight:700;font-size:1rem;">관리자 패널</span>
         <div class="flex gap-8">
-          <button class="btn btn-secondary btn-sm" onclick="adminBackup()">💾 백업 만들기</button>
+          <button class="btn btn-secondary btn-sm" onclick="adminBackup()">백업 만들기</button>
           <button class="btn btn-secondary btn-sm" onclick="showStudentView()">학생화면</button>
           <button class="btn btn-danger btn-sm" onclick="adminLogout()">로그아웃</button>
         </div>
       </div>
 
       <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchAdminTab('review')">📋 검토</button>
-        <button class="tab-btn" onclick="switchAdminTab('publish')">📤 업로드</button>
-        <button class="tab-btn" onclick="switchAdminTab('results')">📊 결과</button>
-        <button class="tab-btn" onclick="switchAdminTab('deadline')">⏰ 기한</button>
+        <button class="tab-btn active" onclick="switchAdminTab('review')">검토</button>
+        <button class="tab-btn" onclick="switchAdminTab('publish')">업로드</button>
+        <button class="tab-btn" onclick="switchAdminTab('results')">결과</button>
+        <button class="tab-btn" onclick="switchAdminTab('deadline')">기한</button>
       </div>
 
       <!-- 탭A: 문제 검토 -->
       <div id="atab-review" class="admin-panel active">
         <div class="card">
-          <div class="card-title"><span class="icon">📋</span> 제출 문제 검토</div>
+          <div class="card-title">제출 문제 검토</div>
           <div class="flex gap-8 items-center flex-wrap" style="margin-bottom:14px">
             <select id="adminReviewWeek" class="form-select" style="max-width:140px">
               <option value="">전체 주차</option>
@@ -886,14 +942,14 @@ body {
               <label class="radio-label"><input type="radio" name="review-class" value="B"><span class="dot"></span>B반</label>
             </div>
             <button class="btn btn-primary btn-sm" onclick="loadAdminSubmissions()">조회</button>
-            <button class="btn btn-secondary btn-sm" onclick="loadNonSubmitters('question')">👥 미제출자 명단</button>
-            <button class="btn btn-secondary btn-sm" onclick="downloadQuestionBankCSV()">⬇️ 전체 문제 CSV</button>
+            <button class="btn btn-secondary btn-sm" onclick="loadNonSubmitters('question')">미제출자 명단</button>
+            <button class="btn btn-secondary btn-sm" onclick="downloadQuestionBankCSV()">전체 문제 CSV</button>
           </div>
           <div id="reviewNonSubmitters"></div>
           <div id="adminSubmissionsList"></div>
         </div>
         <div class="card">
-          <div class="card-title"><span class="icon">➕</span> 교수자 문제 추가</div>
+          <div class="card-title">교수자 문제 추가</div>
           <div class="form-group">
             <label class="form-label">주차</label>
             <select id="profWeek" class="form-select">
@@ -960,7 +1016,7 @@ body {
       <!-- 탭B: 퀴즈 업로드 -->
       <div id="atab-publish" class="admin-panel">
         <div class="card">
-          <div class="card-title"><span class="icon">📤</span> 퀴즈 게시</div>
+          <div class="card-title">퀴즈 게시</div>
           <div class="form-group">
             <label class="form-label">주차</label>
             <select id="publishWeek" class="form-select">
@@ -977,7 +1033,7 @@ body {
           <button class="btn btn-secondary btn-full" onclick="loadQuizPreview()">미리보기</button>
           <div id="quizPreviewList" style="margin-top:16px"></div>
           <div id="publishBtnWrap" class="hidden mt-12">
-            <button class="btn btn-primary btn-full" id="publishBtn" onclick="publishQuiz()">🚀 퀴즈 게시</button>
+            <button class="btn btn-primary btn-full" id="publishBtn" onclick="publishQuiz()">퀴즈 게시</button>
           </div>
         </div>
       </div>
@@ -986,7 +1042,7 @@ body {
       <div id="atab-results" class="admin-panel">
         <div class="card">
           <div class="card-title">
-            <span class="icon">📊</span> 퀴즈 결과
+            퀴즈 결과
             <span id="pendingBadge" class="badge badge-warning hidden" style="margin-left:auto"></span>
           </div>
           <div class="flex gap-8 items-center flex-wrap" style="margin-bottom:14px">
@@ -1000,7 +1056,7 @@ body {
             </div>
             <button class="btn btn-primary btn-sm" onclick="loadAdminResults()">조회</button>
             <button class="btn btn-secondary btn-sm" onclick="downloadCSV()">CSV</button>
-            <button class="btn btn-secondary btn-sm" onclick="loadNonSubmitters('quiz')">👥 미응시자 명단</button>
+            <button class="btn btn-secondary btn-sm" onclick="loadNonSubmitters('quiz')">미응시자 명단</button>
           </div>
           <div id="resultNonSubmitters"></div>
           <div id="pendingGradingList"></div>
@@ -1012,9 +1068,9 @@ body {
       <!-- 탭D: 기한 설정 -->
       <div id="atab-deadline" class="admin-panel">
         <div class="card">
-          <div class="card-title"><span class="icon">⏰</span> 주차별 기한 설정</div>
+          <div class="card-title">주차별 기한 설정</div>
           <div id="deadlineSettingsList"></div>
-          <button class="btn btn-secondary btn-sm mt-8" onclick="loadDeadlineSettings()">🔄 새로고침</button>
+          <button class="btn btn-secondary btn-sm mt-8" onclick="loadDeadlineSettings()">새로고침</button>
         </div>
       </div>
 
@@ -1327,16 +1383,16 @@ function renderSubmissionGrid(statusList) {
   grid.innerHTML = "";
   statusList.forEach(s => {
     const card = document.createElement("div");
-    let cardCls, icon, label;
+    let cardCls, label;
     if (s.state === "submitted") {
-      cardCls = "week-card submitted"; icon = "✅"; label = "제출완료";
+      cardCls = "week-card submitted"; label = "제출완료";
     } else if (s.state === "not_submitted") {
-      cardCls = "week-card not-submitted"; icon = "🟡"; label = "미제출";
+      cardCls = "week-card not-submitted"; label = "미제출";
     } else {
-      cardCls = "week-card closed"; icon = "⬜"; label = "마감";
+      cardCls = "week-card closed"; label = "마감";
     }
     card.className = cardCls;
-    card.innerHTML = `<div class="week-num">${s.week}주차</div><div class="week-status">${icon} ${label}</div>`;
+    card.innerHTML = `<div class="week-num">${s.week}주차</div><div class="week-status">${label}</div>`;
     grid.appendChild(card);
   });
 }
@@ -1347,21 +1403,21 @@ function renderQuizGrid(statusList, cls) {
   statusList.forEach(s => {
     const hasQuiz = cls === 'A' ? s.hasQuizA : s.hasQuizB;
     const card = document.createElement("div");
-    let cardCls, icon, label;
+    let cardCls, label;
     if (!hasQuiz) {
-      cardCls = "week-card closed"; icon = "⬜"; label = "퀴즈없음";
+      cardCls = "week-card closed"; label = "퀴즈없음";
     } else if (s.quizDone) {
-      cardCls = "week-card submitted"; icon = "✅";
+      cardCls = "week-card submitted";
       label = s.attempts > 1
         ? `첫 ${s.firstScore}/${s.firstTotal} · 최근 ${s.lastScore}/${s.lastTotal} · ${s.attempts}회 응시`
         : `${s.lastScore}/${s.lastTotal}점`;
     } else if (!s.quiz_is_open) {
-      cardCls = "week-card closed"; icon = "⬜"; label = "응시마감";
+      cardCls = "week-card closed"; label = "응시마감";
     } else {
-      cardCls = "week-card not-submitted"; icon = "🟡"; label = "미응시";
+      cardCls = "week-card not-submitted"; label = "미응시";
     }
     card.className = cardCls;
-    card.innerHTML = `<div class="week-num">${s.week}주차</div><div class="week-status">${icon} ${label}</div>`;
+    card.innerHTML = `<div class="week-num">${s.week}주차</div><div class="week-status">${label}</div>`;
     grid.appendChild(card);
   });
 }
@@ -1467,7 +1523,7 @@ function renderQuestion() {
   const prevBtn = document.getElementById("prevBtn");
   const nextBtn = document.getElementById("nextBtn");
   prevBtn.disabled = currentQuestion === 0;
-  nextBtn.textContent = currentQuestion === total - 1 ? "제출 ✓" : "다음 ▶";
+  nextBtn.textContent = currentQuestion === total - 1 ? "제출" : "다음 ▶";
 
   let html = `<div class="question-card">
     <span class="question-type-badge">${q.question_type}</span>
@@ -1569,7 +1625,9 @@ async function submitQuiz() {
 
     let html = "";
     data.items.forEach((r, i) => {
-      let icon = r.pending ? "❓" : (r.correct ? "✅" : "❌");
+      let statusChip = r.pending
+        ? '<span class="chip chip-wait">확인중</span>'
+        : (r.correct ? '<span class="chip chip-ok">정답</span>' : '<span class="chip chip-bad">오답</span>');
       let ansHtml = "";
       if (r.pending) {
         ansHtml = `<span class="result-pending">교수자 확인 중</span>`;
@@ -1578,9 +1636,9 @@ async function submitQuiz() {
       } else {
         ansHtml = `<span class="result-wrong">내 답: ${escHtml(r.my_answer||"(미응답)")} → 정답: ${escHtml(r.correct_answer)}</span>`;
       }
-      const expHtml = r.explanation ? `<div class="result-exp">💡 ${escHtml(r.explanation)}</div>` : "";
+      const expHtml = r.explanation ? `<div class="result-exp">${escHtml(r.explanation)}</div>` : "";
       html += `<div class="result-item">
-        <div class="result-icon">${icon}</div>
+        <div class="result-icon">${statusChip}</div>
         <div class="result-details">
           <div class="result-q">${i+1}. ${escHtml(r.question)}</div>
           <div class="result-ans">${ansHtml}</div>
@@ -1673,9 +1731,9 @@ function renderAdminSubmissions(list) {
 
   el.innerHTML = list.map(s => {
     const statusBadge = s.status === "approved"
-      ? '<span class="badge badge-success">✅ 승인</span>'
+      ? '<span class="badge badge-success">승인</span>'
       : s.status === "rejected"
-      ? '<span class="badge badge-danger">❌ 반려</span>'
+      ? '<span class="badge badge-danger">반려</span>'
       : '<span class="badge badge-warning">⏳ 대기</span>';
 
     const choicesHtml = s.question_type === "객관식" ? `
@@ -1702,9 +1760,9 @@ function renderAdminSubmissions(list) {
         <textarea class="form-textarea" id="s-exp-${s._row}" style="min-height:50px">${escHtml(s.explanation||'')}</textarea>
       </div>
       <div class="submission-actions">
-        <button class="btn btn-success btn-sm" onclick="updateSubmission(${s._row},'approved')">✅ 승인</button>
-        <button class="btn btn-danger btn-sm" onclick="updateSubmission(${s._row},'rejected')">❌ 반려</button>
-        <button class="btn btn-secondary btn-sm" onclick="saveSubmissionEdit(${s._row})">💾 저장</button>
+        <button class="btn btn-success btn-sm" onclick="updateSubmission(${s._row},'approved')">승인</button>
+        <button class="btn btn-danger btn-sm" onclick="updateSubmission(${s._row},'rejected')">반려</button>
+        <button class="btn btn-secondary btn-sm" onclick="saveSubmissionEdit(${s._row})">저장</button>
       </div>
     </div>`;
   }).join('');
@@ -1794,7 +1852,7 @@ async function loadQuizPreview() {
         <strong>${i+1}. [${q.question_type}]</strong> ${escHtml(q.question)}
         <div style="margin-top:4px;color:var(--gray-600)">정답: ${escHtml(q.answer)} · 제출자: ${escHtml(q.name)}</div>
       </div>`).join('');
-    document.getElementById("publishBtn").textContent = `🚀 ${week}주차 ${cls}반 퀴즈 게시`;
+    document.getElementById("publishBtn").textContent = `${week}주차 ${cls}반 퀴즈 게시`;
     document.getElementById("publishBtnWrap").classList.remove("hidden");
   } catch(e) { showToast(e.message, "error"); }
 }
@@ -1908,10 +1966,10 @@ function showResultDetail(row) {
   const html = items.map((it, i) => {
     let statusHtml = it.pending
       ? `<span class="result-pending">미채점</span>
-         <button class="btn btn-success btn-sm" onclick="gradeItemInModal(${r._row},${i},'correct',this)">✅맞음</button>
-         <button class="btn btn-danger btn-sm" onclick="gradeItemInModal(${r._row},${i},'wrong',this)">❌틀림</button>`
-      : (it.correct ? '<span class="result-correct">✅ 정답</span>' : '<span class="result-wrong">❌ 오답</span>');
-    const expHtml = it.explanation ? `<div class="result-exp">💡 ${escHtml(it.explanation)}</div>` : "";
+         <button class="btn btn-success btn-sm" onclick="gradeItemInModal(${r._row},${i},'correct',this)">맞음</button>
+         <button class="btn btn-danger btn-sm" onclick="gradeItemInModal(${r._row},${i},'wrong',this)">틀림</button>`
+      : (it.correct ? '<span class="result-correct">정답</span>' : '<span class="result-wrong">오답</span>');
+    const expHtml = it.explanation ? `<div class="result-exp">${escHtml(it.explanation)}</div>` : "";
     return `<div class="result-item">
       <div class="result-details">
         <div class="result-q">${i+1}. [${escHtml(it.question_type)}] ${escHtml(it.question)}</div>
@@ -2009,8 +2067,8 @@ function renderPendingGradingList(list) {
         <div class="result-q">${escHtml(p.question)}</div>
         <div class="result-ans">내 답: <strong>${escHtml(p.my_answer||'(없음)')}</strong>${p.correct_answer ? ' / 모범답안: ' + escHtml(p.correct_answer) : ''}</div>
         <div class="mt-8 flex gap-8">
-          <button class="btn btn-success btn-sm" onclick="gradePendingItem(${p.row},${p.idx},'correct',this)">✅ 맞음</button>
-          <button class="btn btn-danger btn-sm" onclick="gradePendingItem(${p.row},${p.idx},'wrong',this)">❌ 틀림</button>
+          <button class="btn btn-success btn-sm" onclick="gradePendingItem(${p.row},${p.idx},'correct',this)">맞음</button>
+          <button class="btn btn-danger btn-sm" onclick="gradePendingItem(${p.row},${p.idx},'wrong',this)">틀림</button>
         </div>
       </div>
     </div>`).join('');
@@ -2056,7 +2114,7 @@ function renderNonSubmitters(type) {
   const label = type === "quiz" ? "퀴즈 미응시" : "문제 미제출";
 
   if (!data.list.length) {
-    el.innerHTML = `<p style="color:var(--gray-500);font-size:0.85rem;margin-bottom:14px">${data.week}주차 ${data.cls}반 ${label}자가 없습니다. 🎉</p>`;
+    el.innerHTML = `<p style="color:var(--gray-500);font-size:0.85rem;margin-bottom:14px">${data.week}주차 ${data.cls}반 ${label}자가 없습니다.</p>`;
     return;
   }
 
@@ -2064,7 +2122,7 @@ function renderNonSubmitters(type) {
     <div class="deadline-card">
       <div class="deadline-card-title">${data.week}주차 ${data.cls}반 ${label}자 (${data.list.length}명)</div>
       <div style="font-size:0.85rem;color:var(--gray-700);margin-bottom:10px">${data.list.map(s => `${escHtml(s.name)}(${escHtml(s.student_id)})`).join(", ")}</div>
-      <button class="btn btn-secondary btn-sm" onclick="copyNonSubmitters('${type}')">📋 미제출자 명단 복사</button>
+      <button class="btn btn-secondary btn-sm" onclick="copyNonSubmitters('${type}')">미제출자 명단 복사</button>
     </div>`;
 }
 
@@ -2188,8 +2246,7 @@ function showToast(msg, type = "info") {
   const container = document.getElementById("toastContainer");
   const toast = document.createElement("div");
   toast.className = `toast toast-${type}`;
-  const icon = type === "success" ? "✅" : type === "error" ? "❌" : "ℹ️";
-  toast.innerHTML = `<span>${icon}</span><span>${escHtml(msg)}</span>`;
+  toast.innerHTML = `<span class="toast-dot"></span><span>${escHtml(msg)}</span>`;
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 3500);
 }
