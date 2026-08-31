@@ -156,6 +156,28 @@ body::before {
 }
 .subject-select:focus { outline: none; border-color: var(--primary); }
 
+/* ===== 본인 확인 카드 ===== */
+.id-fields { display: flex; gap: 14px; margin-bottom: 4px; }
+.id-fields .form-group { flex: 1; margin-bottom: 16px; }
+.id-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-height: 1.4em;
+}
+.id-status-neutral { color: var(--muted); }
+.id-status-bad { color: var(--bad); }
+.id-status-ok { color: var(--ok); }
+.id-hint { margin-top: 12px; font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+.id-privacy { margin-top: 6px; font-size: 0.72rem; color: var(--muted); line-height: 1.5; }
+
+#studentTabs.locked { opacity: .5; pointer-events: none; }
+
 /* ===== Tabs ===== */
 .tab-bar {
   display: flex;
@@ -726,6 +748,30 @@ body::before {
 
   <!-- Student Tabs -->
   <div id="studentView">
+    <!-- 본인 확인 -->
+    <div class="card id-card">
+      <div class="card-title">본인 확인</div>
+      <div class="id-fields">
+        <div class="form-group">
+          <label class="form-label">이름</label>
+          <input type="text" id="id-name" class="form-input" placeholder="이름을 입력하세요" onkeydown="if(event.key==='Enter')verifyIdentity()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">학번</label>
+          <input type="text" id="id-no" class="form-input" placeholder="1234567" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter')verifyIdentity()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">분반</label>
+          <div class="radio-group" id="idSectionGroup"></div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" id="idVerifyBtn" onclick="verifyIdentity()">확인하기</button>
+      <div class="id-status" id="idStatus"></div>
+      <div class="id-hint">이 기기에서는 다시 입력하지 않아도 됩니다. 공용 기기에서는 사용 후 정보 지우기를 눌러주세요.</div>
+      <div class="id-privacy">수집 항목: 이름·학번·분반 (본인 확인 및 수강 명단 대조 목적, 학기 종료 후 삭제)</div>
+    </div>
+
+    <div id="studentTabs">
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchTab('submit')">문제 제출</button>
       <button class="tab-btn" onclick="switchTab('quiz')">퀴즈 풀기</button>
@@ -737,21 +783,6 @@ body::before {
       <div class="card">
         <div class="card-title">문제 제출</div>
 
-        <div class="form-group">
-          <label class="form-label">이름</label>
-          <input type="text" id="sub-name" class="form-input" placeholder="이름을 입력하세요">
-        </div>
-        <div class="form-group">
-          <label class="form-label">학번</label>
-          <input type="text" id="sub-sid" class="form-input" placeholder="학번을 입력하세요">
-        </div>
-        <div class="form-group">
-          <label class="form-label">분반</label>
-          <div class="radio-group">
-            <label class="radio-label"><input type="radio" name="sub-class" value="A"><span class="dot"></span>A반</label>
-            <label class="radio-label"><input type="radio" name="sub-class" value="B"><span class="dot"></span>B반</label>
-          </div>
-        </div>
         <div class="form-group">
           <label class="form-label">주차 선택</label>
           <select id="sub-week" class="form-select">
@@ -833,21 +864,6 @@ body::before {
       <div id="quizEntryForm" class="card">
         <div class="card-title">퀴즈 풀기</div>
         <div class="form-group">
-          <label class="form-label">이름</label>
-          <input type="text" id="quiz-name" class="form-input" placeholder="이름을 입력하세요">
-        </div>
-        <div class="form-group">
-          <label class="form-label">학번</label>
-          <input type="text" id="quiz-sid" class="form-input" placeholder="학번을 입력하세요">
-        </div>
-        <div class="form-group">
-          <label class="form-label">분반</label>
-          <div class="radio-group">
-            <label class="radio-label"><input type="radio" name="quiz-class" value="A" onchange="updateQuizWeekDropdown()"><span class="dot"></span>A반</label>
-            <label class="radio-label"><input type="radio" name="quiz-class" value="B" onchange="updateQuizWeekDropdown()"><span class="dot"></span>B반</label>
-          </div>
-        </div>
-        <div class="form-group">
           <label class="form-label">주차 선택</label>
           <select id="quiz-week" class="form-select">
             <option value="">-- 분반 선택 후 주차를 선택하세요 --</option>
@@ -882,21 +898,6 @@ body::before {
 
     <!-- Tab 3: 제출 현황 -->
     <div id="tab-status" class="tab-panel">
-      <div class="card">
-        <div class="card-title">제출 현황 조회</div>
-        <div class="flex gap-8" style="margin-bottom:14px">
-          <input type="text" id="st-name" class="form-input" placeholder="이름">
-          <input type="text" id="st-sid" class="form-input" placeholder="학번">
-        </div>
-        <div class="form-group">
-          <label class="form-label">분반</label>
-          <div class="radio-group">
-            <label class="radio-label"><input type="radio" name="st-class" value="A" onchange="reloadStatusIfReady()"><span class="dot"></span>A반</label>
-            <label class="radio-label"><input type="radio" name="st-class" value="B" onchange="reloadStatusIfReady()"><span class="dot"></span>B반</label>
-          </div>
-        </div>
-        <button class="btn btn-primary btn-full" onclick="loadStatus()">조회하기</button>
-      </div>
       <div id="statusResult" class="hidden">
         <div class="card">
           <div class="card-title">문제 제출 현황</div>
@@ -918,6 +919,7 @@ body::before {
         </div>
       </div>
     </div>
+    </div><!-- /studentTabs -->
   </div><!-- /studentView -->
 
   <!-- ===== ADMIN VIEW ===== -->
@@ -1179,7 +1181,7 @@ function onSubjectChange() {
 
   updateSubjectDependentUI();
   loadDeadlines();
-  if (typeof reverifyMe === "function") reverifyMe();
+  reverifyMe();
 }
 
 // 과목이 바뀔 때 제목/분반 등 과목에 종속된 화면 요소를 갱신한다.
@@ -1201,18 +1203,192 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   populateSubjectSelect();
   updateSubjectDependentUI();
+
+  me = loadMe();
+  renderIdSectionOptions();
+  lockStudentTabs();
+  setIdStatus("neutral", "이름과 분반을 입력하면 수강 명단과 대조합니다.");
+
   if (location.hash === "#admin") showAdminView();
   else loadDeadlines();
   populateWeekDropdowns();
   autoTrimInputs();
+  reverifyMe(); // 저장된 본인 정보가 있으면 서버에 다시 물어 검증한다 (신뢰하지 않고 재확인)
 });
 
 // 입력 필드에서 포커스를 벗어날 때 앞뒤 공백을 자동으로 제거
 function autoTrimInputs() {
-  ["sub-name","sub-sid","quiz-name","quiz-sid","st-name","st-sid"].forEach(id => {
+  ["id-name","id-no"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("blur", () => { el.value = el.value.trim(); });
   });
+}
+
+// =============================================
+// 본인 확인 (이름/학번/분반 → 명단 대조, localStorage 유지)
+// =============================================
+const ME_KEY = "slpquizlab.me";
+let me = { name: "", no: "", sec: {} };  // 명단에서 확인된 값만 저장 (입력값 그대로가 아님)
+let meVerifiedSubject = null;            // 현재 과목 기준으로 검증을 통과했는지
+
+function loadMe() {
+  const raw = safeStorageGet(localStorage, ME_KEY);
+  if (!raw) return { name: "", no: "", sec: {} };
+  try {
+    const parsed = JSON.parse(raw);
+    return { name: parsed.name || "", no: parsed.no || "", sec: parsed.sec || {} };
+  } catch (e) {
+    return { name: "", no: "", sec: {} };
+  }
+}
+function saveMe() { safeStorageSet(localStorage, ME_KEY, JSON.stringify(me)); }
+
+function clearMe() {
+  me = { name: "", no: "", sec: {} };
+  meVerifiedSubject = null;
+  safeStorageRemove(localStorage, ME_KEY);
+  const nameEl = document.getElementById("id-name");
+  const noEl = document.getElementById("id-no");
+  if (nameEl) nameEl.value = "";
+  if (noEl) noEl.value = "";
+  document.querySelectorAll('#idSectionGroup input[type="radio"]').forEach(r => r.checked = false);
+  lockStudentTabs();
+  setIdStatus("neutral", "이름과 분반을 입력하면 수강 명단과 대조합니다.");
+}
+
+function renderIdSectionOptions() {
+  const wrap = document.getElementById("idSectionGroup");
+  if (!wrap || !currentSubject) return;
+  const savedSec = (me.sec && me.sec[currentSubject.id]) || "";
+  wrap.innerHTML = currentSubject.sections.map(sec => `
+    <label class="radio-label">
+      <input type="radio" name="id-section" value="${sec}" ${sec === savedSec ? "checked" : ""} onchange="verifyIdentity()">
+      <span class="dot"></span>${sec}반
+    </label>`).join("");
+}
+
+function lockStudentTabs() {
+  const el = document.getElementById("studentTabs");
+  if (el) el.classList.add("locked");
+}
+function unlockStudentTabs() {
+  const el = document.getElementById("studentTabs");
+  if (el) el.classList.remove("locked");
+}
+
+function setIdStatus(kind, text) {
+  const el = document.getElementById("idStatus");
+  if (!el) return;
+  el.className = `id-status id-status-${kind}`;
+  const clearBtn = kind === "ok" ? `<button class="btn btn-secondary btn-sm" onclick="clearMe()">정보 지우기</button>` : "";
+  el.innerHTML = `<span>${escHtml(text)}</span>${clearBtn}`;
+}
+
+const ID_VERIFY_MESSAGES = {
+  not_in_roster: { kind: "bad", text: () => "수강 명단에서 이름을 찾을 수 없습니다." },
+  wrong_section: { kind: "bad", text: (name, result) => `${name} 학생은 ${result.sec}반 소속입니다. 분반을 확인해 주세요.` },
+  need_id:       { kind: "neutral", text: () => "동명이인이 있습니다. 학번을 정확히 입력해주세요." },
+  id_mismatch:   { kind: "bad", text: () => "이름과 학번이 서로 다릅니다. 다시 확인해주세요." }
+};
+
+function applyVerifyResult(name, result) {
+  if (result.ok) {
+    me.name = result.name;
+    me.no = result.no;
+    me.sec = me.sec || {};
+    me.sec[currentSubject.id] = result.sec;
+    saveMe();
+    meVerifiedSubject = currentSubject.id;
+
+    const nameEl = document.getElementById("id-name");
+    const noEl = document.getElementById("id-no");
+    if (nameEl) nameEl.value = me.name;
+    if (noEl) noEl.value = me.no;
+    renderIdSectionOptions();
+
+    unlockStudentTabs();
+    setIdStatus("ok", `${result.sec}반 ${result.name} 학생으로 확인되었습니다. 세 개 탭을 모두 이용할 수 있습니다.`);
+    onIdentityReady();
+  } else {
+    meVerifiedSubject = null;
+    lockStudentTabs();
+    const m = ID_VERIFY_MESSAGES[result.reason] || { kind: "bad", text: () => "수강 명단에서 확인되지 않습니다." };
+    setIdStatus(m.kind, m.text(name, result));
+  }
+}
+
+// 명단 대조 API 호출 (입력 폼에서 트리거) → 통과 시 세 탭을 잠금 해제한다.
+async function verifyIdentity() {
+  if (!currentSubject) return;
+  const nameEl = document.getElementById("id-name");
+  const noEl = document.getElementById("id-no");
+  const secEl = document.querySelector('input[name="id-section"]:checked');
+
+  const name = (nameEl?.value || "").trim();
+  const no = (noEl?.value || "").trim();
+  const sec = secEl?.value || "";
+
+  if (!name || !sec) {
+    meVerifiedSubject = null;
+    lockStudentTabs();
+    setIdStatus("neutral", "이름과 분반을 입력하면 수강 명단과 대조합니다.");
+    return;
+  }
+
+  const btn = document.getElementById("idVerifyBtn");
+  if (btn) btn.disabled = true;
+  try {
+    const data = await api({ action: "verifyStudent", name, student_id: no, class: sec });
+    applyVerifyResult(name, data.result);
+  } catch (e) {
+    setIdStatus("bad", e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// 저장된 me가 있으면 페이지 로드/과목 전환 시 자동으로 재검증한다(다시 입력하지 않아도 됨).
+// 명단에서 빠진 학생이 저장값만으로 통과하지 않도록, 저장값을 그대로 신뢰하지 않고
+// 항상 서버에 다시 물어본다.
+async function reverifyMe() {
+  if (!currentSubject) return;
+  renderIdSectionOptions();
+
+  const sec = me.sec && me.sec[currentSubject.id];
+  if (!me.name || !sec) {
+    meVerifiedSubject = null;
+    lockStudentTabs();
+    setIdStatus("neutral", "이름과 분반을 입력하면 수강 명단과 대조합니다.");
+    return;
+  }
+
+  const nameEl = document.getElementById("id-name");
+  const noEl = document.getElementById("id-no");
+  if (nameEl) nameEl.value = me.name;
+  if (noEl) noEl.value = me.no;
+
+  try {
+    const data = await api({ action: "verifyStudent", name: me.name, student_id: me.no, class: sec });
+    if (data.result.ok) {
+      applyVerifyResult(me.name, data.result);
+    } else {
+      meVerifiedSubject = null;
+      lockStudentTabs();
+      setIdStatus("bad", "저장된 정보로 다시 확인하지 못했습니다. 이름/학번/분반을 다시 확인해주세요.");
+    }
+  } catch (e) {
+    // 통신 오류로 재검증에 실패한 경우까지 매번 잠그면 네트워크가 불안정할 때 너무 가혹하므로,
+    // 서버가 명확히 거부한 경우에만 상태를 바꾸고, 통신 오류는 안내만 하고 다시 시도를 유도한다.
+    setIdStatus("neutral", "본인 확인 정보를 다시 불러오지 못했습니다. 새로고침하거나 확인하기를 눌러주세요.");
+  }
+}
+
+// 본인 확인이 완료되면 현재 상태에 필요한 데이터를 자동으로 불러온다.
+function onIdentityReady() {
+  loadDeadlines();
+  reloadStatusIfReady();
+  const statusTab = document.getElementById("tab-status");
+  if (statusTab && statusTab.classList.contains("active")) loadStatus();
 }
 
 function populateWeekDropdowns() {
@@ -1243,8 +1419,11 @@ const API_RETRY_DELAY_MS = 1000;
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 async function api(params) {
+  // 과목이 지정되지 않은 요청에는 현재 선택된 과목을 자동으로 붙인다.
+  const body = (params.subject || !currentSubject) ? params : { ...params, subject: currentSubject.id };
+
   for (let attempt = 1; attempt <= API_MAX_ATTEMPTS; attempt++) {
-    showSpinner(attempt > 1 ? "처리 중입니다..." : undefined);
+    showSpinner(attempt > 1 ? "처리 중입니다... (최대 10초 소요)" : "최대 10초 소요됩니다...");
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
@@ -1253,7 +1432,7 @@ async function api(params) {
       const res = await fetch(GAS_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(params),
+        body: JSON.stringify(body),
         signal: controller.signal
       });
       if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { isNetworkError: true });
@@ -1312,7 +1491,7 @@ function updateWeekDropdownWithDeadlines() {
 }
 
 function updateQuizWeekDropdown() {
-  const cls = document.querySelector('input[name="quiz-class"]:checked')?.value;
+  const cls = currentSubject && me.sec ? me.sec[currentSubject.id] : null;
   const sel = document.getElementById("quiz-week");
   if (!sel) return;
   sel.innerHTML = '<option value="">-- 퀴즈가 있는 주차를 선택하세요 --</option>';
@@ -1341,6 +1520,7 @@ function switchTab(tab) {
   document.getElementById(`tab-${tab}`).classList.add("active");
   event.currentTarget.classList.add("active");
   if (tab === "status" || tab === "quiz") loadDeadlines();
+  if (tab === "status" && meVerifiedSubject === (currentSubject && currentSubject.id)) loadStatus();
 }
 
 function switchAdminTab(tab) {
@@ -1367,16 +1547,17 @@ function updateQuestionForm() {
 }
 
 async function submitQuestion() {
-  const name = document.getElementById("sub-name").value.trim();
-  const sid = document.getElementById("sub-sid").value.trim();
-  const cls = document.querySelector('input[name="sub-class"]:checked')?.value;
+  if (meVerifiedSubject !== (currentSubject && currentSubject.id)) {
+    return showToast("먼저 본인 확인을 완료해주세요.", "error");
+  }
+  const name = me.name;
+  const sid = me.no;
+  const cls = me.sec[currentSubject.id];
   const week = document.getElementById("sub-week").value;
   const type = document.querySelector('input[name="sub-type"]:checked')?.value;
   const question = document.getElementById("sub-question")?.value.trim();
   const explanation = document.getElementById("sub-explanation")?.value.trim();
 
-  if (!name || !sid) return showToast("이름과 학번을 입력해주세요.", "error");
-  if (!cls) return showToast("분반을 선택해주세요.", "error");
   if (!week) return showToast("주차를 선택해주세요.", "error");
   if (!type) return showToast("문제 유형을 선택해주세요.", "error");
   if (!question) return showToast("문제 내용을 입력해주세요.", "error");
@@ -1404,13 +1585,11 @@ async function submitQuestion() {
     const data = await api({ action:"submitQuestion", name, student_id:sid, class:cls, week, question_type:type, question, choices, answer, explanation });
     showToast(data.message, "success");
     // Reset form
-    document.getElementById("sub-name").value = "";
-    document.getElementById("sub-sid").value = "";
     document.getElementById("sub-question").value = "";
     document.getElementById("sub-explanation").value = "";
     document.getElementById("questionForm").classList.add("hidden");
     [1,2,3,4].forEach(i => { const el = document.getElementById(`ch${i}`); if(el) el.value=""; });
-    document.querySelectorAll('input[name="sub-class"], input[name="sub-type"], input[name="sub-mcq-ans"], input[name="sub-ox-ans"]').forEach(r => r.checked = false);
+    document.querySelectorAll('input[name="sub-type"], input[name="sub-mcq-ans"], input[name="sub-ox-ans"]').forEach(r => r.checked = false);
     document.getElementById("sub-week").value = "";
   } catch(e) {
     showToast(e.message, "error");
@@ -1423,23 +1602,11 @@ async function submitQuestion() {
 // Tab3: Status
 // =============================================
 async function loadStatus() {
-  const name = document.getElementById("st-name").value.trim();
-  const sid  = document.getElementById("st-sid").value.trim();
-  const cls  = document.querySelector('input[name="st-class"]:checked')?.value;
-  if (!name || !sid) return showToast("이름과 학번을 입력해주세요.", "error");
-  if (!cls) return showToast("분반을 선택해주세요.", "error");
+  if (meVerifiedSubject !== (currentSubject && currentSubject.id)) return;
+  const cls = me.sec[currentSubject.id];
 
   try {
-    const data = await api({ action:"getSubmissionStatus", name, student_id:sid, class:cls });
-
-    // 15주 전부 not_submitted → 입력 정보가 잘못된 것으로 간주 (roster 미설정 시 보조 체크)
-    const hasAnySubmission = data.status.some(s => s.state === "submitted");
-    if (!hasAnySubmission) {
-      document.getElementById("statusResult").classList.add("hidden");
-      showToast("입력하신 정보를 다시 확인해주세요.", "error");
-      return;
-    }
-
+    const data = await api({ action:"getSubmissionStatus", name: me.name, student_id: me.no, class: cls });
     renderSubmissionGrid(data.status);
     renderQuizGrid(data.status, cls);
     document.getElementById("statusResult").classList.remove("hidden");
@@ -1448,11 +1615,10 @@ async function loadStatus() {
   }
 }
 
-// 분반을 바꿨을 때, 이미 조회 결과가 표시 중이면 자동으로 재조회
+// 본인 확인이 다시 완료되었을 때, 이미 조회 결과가 표시 중이었다면 자동으로 재조회
 function reloadStatusIfReady() {
-  if (!document.getElementById("statusResult").classList.contains("hidden")) {
-    loadStatus();
-  }
+  const el = document.getElementById("statusResult");
+  if (el && !el.classList.contains("hidden")) loadStatus();
 }
 
 function renderSubmissionGrid(statusList) {
@@ -1519,13 +1685,14 @@ function clearQuizProgress() {
 }
 
 async function startQuiz() {
-  const name = document.getElementById("quiz-name").value.trim();
-  const sid = document.getElementById("quiz-sid").value.trim();
-  const cls = document.querySelector('input[name="quiz-class"]:checked')?.value;
+  if (meVerifiedSubject !== (currentSubject && currentSubject.id)) {
+    return showToast("먼저 본인 확인을 완료해주세요.", "error");
+  }
+  const name = me.name;
+  const sid = me.no;
+  const cls = me.sec[currentSubject.id];
   const week = document.getElementById("quiz-week").value;
 
-  if (!name || !sid) return showToast("이름과 학번을 입력해주세요.", "error");
-  if (!cls) return showToast("분반을 선택해주세요.", "error");
   if (!week) return showToast("주차를 선택해주세요.", "error");
 
   const btn = document.getElementById("startQuizBtn");
