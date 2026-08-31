@@ -207,6 +207,8 @@ body::before {
   box-shadow: 0 2px 8px rgba(78,205,196,0.35);
 }
 .tab-btn:hover:not(.active) { background: var(--gray-100); }
+.admin-tab-bar { flex-wrap: wrap; }
+.admin-tab-bar .tab-btn { flex: 1 1 30%; }
 
 .tab-panel { display: none; width: 100%; }
 .tab-panel.active { display: block; }
@@ -294,6 +296,21 @@ body::before {
   border-color: var(--primary);
   background: var(--primary);
 }
+
+/* ===== Toggle Switch ===== */
+.toggle-switch { position: relative; display: inline-block; width: 44px; height: 26px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0; cursor: pointer;
+  background: var(--gray-300); border-radius: 999px; transition: var(--transition);
+}
+.toggle-track::before {
+  content: ""; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px;
+  background: var(--surface); border-radius: 50%; transition: var(--transition);
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.toggle-switch input:checked + .toggle-track { background: var(--ok); }
+.toggle-switch input:checked + .toggle-track::before { transform: translateX(18px); }
 
 /* ===== Buttons ===== */
 .btn {
@@ -948,10 +965,12 @@ body::before {
         </div>
       </div>
 
-      <div class="tab-bar">
+      <div class="tab-bar admin-tab-bar">
         <button class="tab-btn active" onclick="switchAdminTab('review')">검토</button>
         <button class="tab-btn" onclick="switchAdminTab('publish')">업로드</button>
         <button class="tab-btn" onclick="switchAdminTab('results')">결과</button>
+        <button class="tab-btn" onclick="switchAdminTab('students')">학생별</button>
+        <button class="tab-btn" onclick="switchAdminTab('roster')">명단</button>
         <button class="tab-btn" onclick="switchAdminTab('deadline')">기한</button>
       </div>
 
@@ -1091,6 +1110,60 @@ body::before {
         </div>
       </div>
 
+      <!-- 탭: 학생별 현황 -->
+      <div id="atab-students" class="admin-panel">
+        <div class="card">
+          <div class="card-title">학생별 현황</div>
+          <div class="flex gap-8 items-center flex-wrap" style="margin-bottom:14px">
+            <div class="radio-group">
+              <label class="radio-label"><input type="radio" name="students-class" value="" checked onchange="loadStudentList()"><span class="dot"></span>전체</label>
+              <label class="radio-label"><input type="radio" name="students-class" value="A" onchange="loadStudentList()"><span class="dot"></span>A반</label>
+              <label class="radio-label"><input type="radio" name="students-class" value="B" onchange="loadStudentList()"><span class="dot"></span>B반</label>
+            </div>
+            <input type="text" id="studentsSearch" class="form-input" style="max-width:200px" placeholder="이름 또는 학번 검색" oninput="loadStudentList()">
+          </div>
+          <div id="studentListEl"></div>
+          <div id="studentDetailEl" class="mt-16"></div>
+        </div>
+      </div>
+
+      <!-- 탭: 명단 관리 -->
+      <div id="atab-roster" class="admin-panel">
+        <div class="card">
+          <div class="card-title">수강 명단 관리</div>
+          <div class="flex items-center gap-8" style="margin-bottom:16px">
+            <label class="toggle-switch">
+              <input type="checkbox" id="rosterBlockToggle" onchange="saveRosterBlock()">
+              <span class="toggle-track"></span>
+            </label>
+            <span style="font-size:0.85rem;color:var(--ink-2)">명단에 없는 학생 차단</span>
+          </div>
+
+          <div class="flex gap-8 items-center flex-wrap" style="margin-bottom:10px">
+            <div class="radio-group">
+              <label class="radio-label"><input type="radio" name="roster-class" value="A" checked><span class="dot"></span>A반</label>
+              <label class="radio-label"><input type="radio" name="roster-class" value="B"><span class="dot"></span>B반</label>
+            </div>
+            <div class="radio-group">
+              <label class="radio-label"><input type="radio" name="roster-mode" value="append" checked><span class="dot"></span>기존 명단에 추가</label>
+              <label class="radio-label"><input type="radio" name="roster-mode" value="replace"><span class="dot"></span>해당 분반 전체 교체</label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">명단 붙여넣기 <span style="font-weight:400;color:var(--gray-500);font-size:0.85rem">(학번,이름 — 세 번째 열에 분반이 있으면 그것을 우선 적용)</span></label>
+            <textarea id="rosterPasteArea" class="form-textarea" style="min-height:140px" placeholder="1234567,이수민&#10;1234568,박도윤,B"></textarea>
+          </div>
+          <div class="flex gap-8 flex-wrap">
+            <button class="btn btn-primary btn-sm" onclick="applyRoster()">명단 반영</button>
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('rosterPasteArea').value=''">입력 지우기</button>
+            <button class="btn btn-secondary btn-sm" onclick="downloadRosterCSV()">현재 명단 CSV</button>
+          </div>
+
+          <div class="divider"></div>
+          <div id="rosterListEl"></div>
+        </div>
+      </div>
+
       <!-- 탭D: 기한 설정 -->
       <div id="atab-deadline" class="admin-panel">
         <div class="card">
@@ -1131,7 +1204,6 @@ body::before {
 // Global State
 // =============================================
 let deadlinesCache = [];
-let adminPassword = "";
 let adminToken = "";
 let quizData = [];
 let quizAnswers = [];
@@ -1182,6 +1254,22 @@ function onSubjectChange() {
   updateSubjectDependentUI();
   loadDeadlines();
   reverifyMe();
+  refreshVisibleAdminTab();
+}
+
+// 관리자 대시보드가 열려 있으면, 현재 보고 있는 탭의 데이터를 새 과목 기준으로 다시 불러온다.
+function refreshVisibleAdminTab() {
+  const dashboard = document.getElementById("adminDashboard");
+  if (!dashboard || dashboard.classList.contains("hidden")) return;
+  const active = document.querySelector("#adminDashboard .admin-panel.active");
+  if (!active) return;
+  const tab = active.id.replace("atab-", "");
+  document.getElementById("studentDetailEl") && (document.getElementById("studentDetailEl").innerHTML = "");
+  if (tab === "deadline") loadDeadlineSettings();
+  if (tab === "roster") { loadRosterBlockConfig(); loadRosterList(); }
+  if (tab === "students") loadStudentList();
+  if (tab === "review") loadAdminSubmissions();
+  if (tab === "results") loadAdminResults();
 }
 
 // 과목이 바뀔 때 제목/분반 등 과목에 종속된 화면 요소를 갱신한다.
@@ -1529,6 +1617,8 @@ function switchAdminTab(tab) {
   document.getElementById(`atab-${tab}`).classList.add("active");
   event.currentTarget.classList.add("active");
   if (tab === "deadline") loadDeadlineSettings();
+  if (tab === "roster") { loadRosterBlockConfig(); loadRosterList(); }
+  if (tab === "students") loadStudentList();
 }
 
 // =============================================
@@ -1912,9 +2002,17 @@ function resetQuiz() {
 function showAdminView() {
   document.getElementById("studentView").classList.add("hidden");
   document.getElementById("adminView").classList.remove("hidden");
-  document.getElementById("adminDashboard").classList.add("hidden");
-  document.getElementById("adminLoginForm").classList.remove("hidden");
   location.hash = "admin";
+
+  // 세션 토큰이 남아있으면(최대 6시간) 재로그인 없이 바로 대시보드로
+  const savedToken = safeStorageGet(sessionStorage, ADMIN_TOKEN_KEY);
+  if (savedToken) {
+    adminToken = savedToken;
+    enterAdminDashboard();
+  } else {
+    document.getElementById("adminDashboard").classList.add("hidden");
+    document.getElementById("adminLoginForm").classList.remove("hidden");
+  }
 }
 
 function showStudentView() {
@@ -1923,24 +2021,34 @@ function showStudentView() {
   location.hash = "";
 }
 
+const ADMIN_TOKEN_KEY = "slpquizlab.adminToken";
+
 async function adminLogin() {
   const pw = document.getElementById("adminPw").value;
   if (!pw) return showToast("비밀번호를 입력해주세요.", "error");
   try {
-    await api({ action:"adminLogin", password:pw });
-    adminPassword = pw;
-    document.getElementById("adminLoginForm").classList.add("hidden");
-    document.getElementById("adminDashboard").classList.remove("hidden");
-    populateAdminWeekDropdowns();
-    loadDeadlineSettings();
+    const data = await api({ action:"adminLogin", password:pw });
+    if (!data.success) { showToast(data.error || "로그인에 실패했습니다.", "error"); return; }
+    adminToken = data.token;
+    safeStorageSet(sessionStorage, ADMIN_TOKEN_KEY, adminToken);
+    document.getElementById("adminPw").value = "";
+    enterAdminDashboard();
     showToast("관리자로 로그인했습니다.", "success");
   } catch(e) {
     showToast(e.message, "error");
   }
 }
 
+function enterAdminDashboard() {
+  document.getElementById("adminLoginForm").classList.add("hidden");
+  document.getElementById("adminDashboard").classList.remove("hidden");
+  populateAdminWeekDropdowns();
+  loadDeadlineSettings();
+}
+
 function adminLogout() {
-  adminPassword = "";
+  adminToken = "";
+  safeStorageRemove(sessionStorage, ADMIN_TOKEN_KEY);
   document.getElementById("adminDashboard").classList.add("hidden");
   document.getElementById("adminLoginForm").classList.remove("hidden");
   document.getElementById("adminPw").value = "";
@@ -1964,7 +2072,7 @@ function populateAdminWeekDropdowns() {
 async function loadAdminSubmissions() {
   const week = document.getElementById("adminReviewWeek").value;
   try {
-    const data = await api({ action:"adminGetSubmissions", password:adminPassword, week });
+    const data = await api({ action:"adminGetSubmissions", token:adminToken, week });
     renderAdminSubmissions(data.submissions);
   } catch(e) { showToast(e.message, "error"); }
 }
@@ -2018,7 +2126,7 @@ async function updateSubmission(row, status) {
   const answer = document.getElementById(`s-ans-${row}`)?.value;
   const explanation = document.getElementById(`s-exp-${row}`)?.value;
   try {
-    await api({ action:"adminUpdateSubmission", password:adminPassword, row, status, question, choices, answer, explanation });
+    await api({ action:"adminUpdateSubmission", token:adminToken, row, status, question, choices, answer, explanation });
     showToast(status === "approved" ? "승인되었습니다." : "반려되었습니다.", "success");
     loadAdminSubmissions();
   } catch(e) { showToast(e.message, "error"); }
@@ -2030,7 +2138,7 @@ async function saveSubmissionEdit(row) {
   const answer = document.getElementById(`s-ans-${row}`)?.value;
   const explanation = document.getElementById(`s-exp-${row}`)?.value;
   try {
-    await api({ action:"adminUpdateSubmission", password:adminPassword, row, question, choices, answer, explanation });
+    await api({ action:"adminUpdateSubmission", token:adminToken, row, question, choices, answer, explanation });
     showToast("저장되었습니다.", "success");
   } catch(e) { showToast(e.message, "error"); }
 }
@@ -2069,7 +2177,7 @@ async function addProfQuestion() {
   }
 
   try {
-    await api({ action:"adminAddQuestion", password:adminPassword, week, question_type:type, question, choices, answer, explanation });
+    await api({ action:"adminAddQuestion", token:adminToken, week, question_type:type, question, choices, answer, explanation });
     showToast("교수자 문제가 추가되었습니다.", "success");
     document.getElementById("profQuestion").value = "";
     document.getElementById("profExplanation").value = "";
@@ -2084,7 +2192,7 @@ async function loadQuizPreview() {
   if (!week) return showToast("주차를 선택해주세요.", "error");
   if (!cls)  return showToast("분반을 선택해주세요.", "error");
   try {
-    const data = await api({ action:"adminGetQuizPreview", password:adminPassword, week, class: cls });
+    const data = await api({ action:"adminGetQuizPreview", token:adminToken, week, class: cls });
     const el = document.getElementById("quizPreviewList");
     if (!data.questions.length) {
       el.innerHTML = `<p style="color:var(--gray-500)">${cls}반에 승인된 문제가 없습니다.</p>`;
@@ -2107,7 +2215,7 @@ async function publishQuiz() {
   if (!week) return showToast("주차를 선택해주세요.", "error");
   if (!cls)  return showToast("분반을 선택해주세요.", "error");
   try {
-    const data = await api({ action:"adminPublishQuiz", password:adminPassword, week, class: cls });
+    const data = await api({ action:"adminPublishQuiz", token:adminToken, week, class: cls });
     showToast(data.message, "success");
     document.getElementById("publishBtnWrap").classList.add("hidden");
     document.getElementById("quizPreviewList").innerHTML = "";
@@ -2119,14 +2227,14 @@ async function loadAdminResults() {
   const week = document.getElementById("resultWeek").value;
   const cls  = document.querySelector('input[name="result-class"]:checked')?.value || "";
   try {
-    const data = await api({ action:"adminGetResults", password:adminPassword, week, class: cls });
+    const data = await api({ action:"adminGetResults", token:adminToken, week, class: cls });
     adminResultsCache = data.results;
     renderAdminResults(data.results);
     renderPendingBadgeAndList();
 
     const statsEl = document.getElementById("resultStats");
     if (week && cls) {
-      const stats = await api({ action:"adminGetResultStats", password:adminPassword, week, class: cls });
+      const stats = await api({ action:"adminGetResultStats", token:adminToken, week, class: cls });
       renderResultStats(stats);
     } else {
       statsEl.innerHTML = week && !cls
@@ -2251,7 +2359,7 @@ async function gradePendingItem(row, idx, result, btn) {
   const newScore = items.filter(it => !it.pending && it.correct).length;
 
   try {
-    await api({ action:"adminGradeResult", password:adminPassword, row, answers_json: JSON.stringify(items), score: newScore });
+    await api({ action:"adminGradeResult", token:adminToken, row, answers_json: JSON.stringify(items), score: newScore });
     r.answers_json = JSON.stringify(items);
     r.score = newScore;
     showToast("채점 결과가 저장되었습니다.", "success");
@@ -2318,16 +2426,21 @@ function renderPendingGradingList(list) {
     </div>`).join('');
 }
 
+// 공용 CSV 다운로드 헬퍼 (헤더 배열 + 행 배열 → 파일 다운로드)
+function downloadCSVFile(filenamePrefix, headers, rows) {
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v==null?'':v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob(["﻿"+csv], { type:"text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${filenamePrefix}_${Date.now()}.csv`;
+  a.click();
+}
+
 function downloadCSV() {
   if (!adminResultsCache.length) return showToast("결과 데이터가 없습니다.", "info");
   const headers = ["타임스탬프","이름","학번","분반","주차","시도","점수","전체"];
   const rows = adminResultsCache.map(r => [r.timestamp,r.name,r.student_id,r.class,r.week,r.attempt_number,r.score,r.total]);
-  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(",")).join("\n");
-  const blob = new Blob(["﻿"+csv], { type:"text/csv;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `quiz_results_${Date.now()}.csv`;
-  a.click();
+  downloadCSVFile("quiz_results", headers, rows);
 }
 
 // ===== 미제출/미응시 명단 (검토 탭: 문제 미제출, 결과 탭: 퀴즈 미응시) =====
@@ -2343,7 +2456,7 @@ async function loadNonSubmitters(type) {
   if (!cls)  return showToast("분반을 선택해주세요.", "error");
 
   try {
-    const data = await api({ action:"adminGetNonSubmitters", password:adminPassword, week, class:cls, type });
+    const data = await api({ action:"adminGetNonSubmitters", token:adminToken, week, class:cls, type });
     nonSubmittersCache[type] = { week, cls, list: data.nonSubmitters || [] };
     renderNonSubmitters(type);
   } catch(e) { showToast(e.message, "error"); }
@@ -2383,7 +2496,7 @@ function copyNonSubmitters(type) {
 // ===== 문제은행 CSV 내보내기 =====
 async function downloadQuestionBankCSV() {
   try {
-    const data = await api({ action:"adminGetSubmissions", password:adminPassword, week:"" });
+    const data = await api({ action:"adminGetSubmissions", token:adminToken, week:"" });
     const approved = (data.submissions || []).filter(s => s.status === "approved");
     if (!approved.length) return showToast("승인된 문제가 없습니다.", "info");
 
@@ -2392,19 +2505,259 @@ async function downloadQuestionBankCSV() {
       s.week, s.class, s.question_type, s.question, s.choices,
       s.answer, s.explanation, s.student_id === "professor" ? "교수자" : s.name
     ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(",")).join("\n");
-    const blob = new Blob(["﻿"+csv], { type:"text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `question_bank_${Date.now()}.csv`;
-    a.click();
+    downloadCSVFile("question_bank", headers, rows);
   } catch(e) { showToast(e.message, "error"); }
+}
+
+// ===== 공용 모달 =====
+function openModal(title, bodyHtml) {
+  const modal = document.createElement("div");
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;overflow-y:auto;padding:20px";
+  modal.innerHTML = `<div style="max-width:560px;margin:0 auto;background:var(--surface);border-radius:var(--radius-lg);padding:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <strong>${escHtml(title)}</strong>
+      <button class="btn btn-secondary btn-sm" onclick="this.closest('[style]').remove()">닫기</button>
+    </div>
+    <div>${bodyHtml}</div>
+  </div>`;
+  document.body.appendChild(modal);
+  return modal;
+}
+
+// ===== 명단 관리 =====
+async function loadRosterBlockConfig() {
+  try {
+    const data = await api({ action:"adminGetRosterConfig", token:adminToken });
+    const toggle = document.getElementById("rosterBlockToggle");
+    if (toggle) toggle.checked = !!data.blockEnabled;
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+async function saveRosterBlock() {
+  const toggle = document.getElementById("rosterBlockToggle");
+  const enabled = toggle ? toggle.checked : true;
+  try {
+    await api({ action:"adminSetRosterBlock", token:adminToken, enabled });
+    showToast(enabled ? "명단에 없는 학생을 차단합니다." : "명단 차단을 해제했습니다.", "success");
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+// 쉼표(,)와 탭 구분을 모두 인식한다: "학번,이름" 또는 "학번\t이름", 세 번째 열이
+// 있으면 분반으로 우선 사용한다.
+function parseRosterPaste(text) {
+  return String(text || "")
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line)
+    .map(line => line.split(/[,\t]/).map(c => c.trim()))
+    .filter(cols => cols.length >= 2 && cols[0] && cols[1])
+    .map(cols => ({ no: cols[0], name: cols[1], sec: cols[2] || "" }));
+}
+
+async function applyRoster() {
+  const cls = document.querySelector('input[name="roster-class"]:checked')?.value;
+  const mode = document.querySelector('input[name="roster-mode"]:checked')?.value || "append";
+  const text = document.getElementById("rosterPasteArea").value;
+  if (!cls) return showToast("분반을 선택해주세요.", "error");
+
+  const rows = parseRosterPaste(text);
+  if (!rows.length) return showToast("반영할 명단이 없습니다. \"학번,이름\" 형식으로 붙여넣어주세요.", "error");
+
+  if (mode === "replace" && !confirm(`${cls}반 명단을 전체 교체합니다. 계속할까요?`)) return;
+
+  try {
+    const data = await api({ action:"adminSetRoster", token:adminToken, class:cls, mode, rows });
+    showToast(data.message, "success");
+    document.getElementById("rosterPasteArea").value = "";
+    loadRosterList();
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+let rosterListCache = [];
+async function loadRosterList() {
+  try {
+    const data = await api({ action:"adminGetRoster", token:adminToken });
+    rosterListCache = data.roster || [];
+    renderRosterList();
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+function renderRosterList() {
+  const el = document.getElementById("rosterListEl");
+  if (!el) return;
+  if (!rosterListCache.length) {
+    el.innerHTML = `<p style="color:var(--gray-500);font-size:0.85rem">등록된 명단이 없습니다.</p>`;
+    return;
+  }
+  const byClass = {};
+  rosterListCache.forEach(r => { (byClass[r.sec] = byClass[r.sec] || []).push(r); });
+  const sections = Object.keys(byClass).sort();
+
+  el.innerHTML = `<div class="section-title">등록 명단 (총 ${rosterListCache.length}명)</div>` +
+    sections.map(sec => `
+      <div class="deadline-card">
+        <div class="deadline-card-title">${escHtml(sec)}반 (${byClass[sec].length}명)</div>
+        <div style="font-size:0.85rem;color:var(--gray-700);line-height:1.8">
+          ${byClass[sec].map(r => `${escHtml(r.name)}(${escHtml(r.no)})`).join(", ")}
+        </div>
+      </div>`).join("");
+}
+
+function downloadRosterCSV() {
+  if (!rosterListCache.length) return showToast("명단 데이터가 없습니다.", "info");
+  const headers = ["학번","이름","분반","등록일시"];
+  const rows = rosterListCache.map(r => [r.no, r.name, r.sec, r.registered]);
+  downloadCSVFile(`roster_${currentSubject ? currentSubject.id : "list"}`, headers, rows);
+}
+
+// ===== 학생별 현황 =====
+let studentListCache = [];
+let studentDetailCache = null;
+
+function studentChipClass(submitCount) {
+  if (submitCount >= 6) return "chip-ok";
+  if (submitCount >= 4) return "chip-wait";
+  return "chip-bad";
+}
+
+async function loadStudentList() {
+  const cls = document.querySelector('input[name="students-class"]:checked')?.value || "";
+  const query = document.getElementById("studentsSearch")?.value.trim() || "";
+  try {
+    const data = await api({ action:"adminListStudents", token:adminToken, class:cls, query });
+    studentListCache = data.students || [];
+    renderStudentList();
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+function renderStudentList() {
+  const el = document.getElementById("studentListEl");
+  if (!el) return;
+  if (!studentListCache.length) {
+    el.innerHTML = `<p style="color:var(--gray-500);font-size:0.85rem">해당하는 학생이 없습니다.</p>`;
+    return;
+  }
+  el.innerHTML = studentListCache.map(s => `
+    <div class="submission-item" style="cursor:pointer" onclick="showStudentDetail('${escAttr(s.no)}')">
+      <div class="submission-header">
+        <div class="flex items-center gap-8">
+          <span class="badge badge-primary">${escHtml(s.sec)}반</span>
+          <strong>${escHtml(s.name)}</strong>
+        </div>
+        <span class="chip ${studentChipClass(s.submitCount)}">${s.avgAccuracy != null ? s.avgAccuracy + "%" : "-"}</span>
+      </div>
+      <div class="submission-meta">${escHtml(s.no)} · 제출 ${s.submitCount} · 응시 ${s.quizCount}</div>
+    </div>`).join("");
+}
+
+async function showStudentDetail(no) {
+  const el = document.getElementById("studentDetailEl");
+  if (el) el.innerHTML = `<p style="color:var(--gray-500);font-size:0.85rem">불러오는 중...</p>`;
+  try {
+    const data = await api({ action:"adminGetStudentDetail", token:adminToken, no });
+    studentDetailCache = data;
+    renderStudentDetail(data);
+  } catch(e) { showToast(e.message, "error"); }
+}
+
+function renderStudentDetail(data) {
+  const el = document.getElementById("studentDetailEl");
+  if (!el) return;
+
+  const subGrid = data.weeks.map(w => `
+    <div class="week-card ${w.submitted ? "submitted" : "not-submitted"}">
+      <div class="week-num">${w.week}주차</div>
+      <div class="week-status">${w.submitted ? "제출" : "미제출"}</div>
+    </div>`).join("");
+
+  const quizGrid = data.weeks.map(w => {
+    const has = w.attempts > 0;
+    return `<div class="week-card ${has ? "submitted" : "closed"}">
+      <div class="week-num">${w.week}주차</div>
+      <div class="week-status">${has ? `${w.lastScore}/${w.lastTotal}점` : "미응시"}</div>
+    </div>`;
+  }).join("");
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title">${escHtml(data.student.name)}
+        <span style="font-weight:400;color:var(--gray-500);font-size:0.85rem">
+          ${escHtml(data.student.no)} · ${escHtml(data.student.sec)}반${currentSubject ? " · " + escHtml(currentSubject.name) : ""}
+        </span>
+      </div>
+      <div class="stats-summary">
+        <div class="stat-tile"><div class="stat-num">${data.submitCount}</div><div class="stat-label">문제 제출</div></div>
+        <div class="stat-tile"><div class="stat-num">${data.quizCount}</div><div class="stat-label">퀴즈 응시</div></div>
+        <div class="stat-tile"><div class="stat-num">${data.avgAccuracy != null ? data.avgAccuracy + "%" : "-"}</div><div class="stat-label">평균 정답률</div></div>
+      </div>
+      <div class="section-title mt-16">주차별 문제 제출</div>
+      <div class="week-grid">${subGrid}</div>
+      <div class="section-title mt-16">주차별 퀴즈 응시</div>
+      <div class="week-grid">${quizGrid}</div>
+      <div class="flex gap-8 flex-wrap mt-16">
+        <button class="btn btn-secondary btn-sm" onclick="showStudentSubmissions()">제출 문제 보기</button>
+        <button class="btn btn-secondary btn-sm" onclick="showStudentRawResponses()">응답 원본 보기</button>
+        <button class="btn btn-secondary btn-sm" onclick="downloadStudentCSV()">개별 CSV</button>
+      </div>
+    </div>`;
+}
+
+function showStudentSubmissions() {
+  const data = studentDetailCache;
+  if (!data) return;
+  const submitted = data.weeks.filter(w => w.submitted);
+  if (!submitted.length) return showToast("제출한 문제가 없습니다.", "info");
+
+  const html = submitted.map(w => {
+    const s = w.submission;
+    const badgeCls = s.status === "approved" ? "badge-success" : s.status === "rejected" ? "badge-danger" : "badge-gray";
+    return `<div class="result-item">
+      <div class="result-details">
+        <div class="result-q">${w.week}주차 · [${escHtml(s.question_type || "")}] <span class="badge ${badgeCls}">${escHtml(s.status || "")}</span></div>
+        <div class="result-q">${escHtml(s.question)}</div>
+        ${s.choices ? `<div class="result-ans">보기: ${escHtml(s.choices)}</div>` : ""}
+        <div class="result-ans">정답: ${escHtml(s.answer || "")}</div>
+      </div>
+    </div>`;
+  }).join("");
+  openModal(`${data.student.name} · 제출한 문제`, html);
+}
+
+function showStudentRawResponses() {
+  const data = studentDetailCache;
+  if (!data) return;
+  const attempted = data.weeks.filter(w => w.attempts > 0);
+  if (!attempted.length) return showToast("응시 기록이 없습니다.", "info");
+
+  const html = attempted.map(w => w.results.map(r => {
+    let items = [];
+    try { items = JSON.parse(r.answers_json); } catch (e) { items = []; }
+    const itemsHtml = items.map((it, i) => {
+      const state = it.pending ? "확인중" : (it.correct ? "정답" : "오답");
+      return `<div class="result-ans">${i + 1}. 내 답: ${escHtml(it.my_answer || "(미응답)")} — ${state}</div>`;
+    }).join("");
+    return `<div class="result-item">
+      <div class="result-details">
+        <div class="result-q">${w.week}주차 · ${r.attempt_number}회 시도 · ${escHtml(r.timestamp)} · ${r.score}/${r.total}점</div>
+        ${itemsHtml}
+      </div>
+    </div>`;
+  }).join("")).join("");
+  openModal(`${data.student.name} · 응답 원본`, html);
+}
+
+function downloadStudentCSV() {
+  const data = studentDetailCache;
+  if (!data) return;
+  const headers = ["주차","문제제출","퀴즈응시횟수","최근점수","최근총점"];
+  const rows = data.weeks.map(w => [w.week, w.submitted ? "제출" : "미제출", w.attempts, w.lastScore ?? "", w.lastTotal ?? ""]);
+  downloadCSVFile(`student_${data.student.no}`, headers, rows);
 }
 
 // ===== 백업 =====
 async function adminBackup() {
   try {
-    const data = await api({ action:"adminBackup", password:adminPassword });
+    const data = await api({ action:"adminBackup", token:adminToken });
     try { await navigator.clipboard.writeText(data.url); } catch(e) {}
     showToast(`백업 완료 (링크 복사됨): ${data.url}`, "success");
   } catch(e) { showToast(e.message, "error"); }
@@ -2460,7 +2813,7 @@ async function saveDeadline(week) {
   try {
     await api({
       action: "adminSetDeadline",
-      password: adminPassword,
+      token: adminToken,
       week,
       deadline_date: subVal ? subVal.replace("T"," ") + ":00" : "",
       is_open: subOpen,
