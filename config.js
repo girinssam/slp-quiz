@@ -20,7 +20,11 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbwR1rxyuvh83mxnzCuNJbhb
 // weekLabel()이 "0주차" 대신 "테스트 주차"로 바꿔줍니다). 서버(Code.gs)는 이
 // 범위를 참조하지 않고 항상 0~15를 다루므로, 여기서 weeks를 늘려도 Code.gs의
 // 루프 상한(15)도 함께 맞춰야 합니다.
+// 배열 순서 = 과목 선택 드롭다운 노출 순서이며, SUBJECTS[0]이 "처음 방문(저장된
+// 선택 없음)" 시 기본 선택 과목입니다. 단, localStorage에 마지막으로 본 과목이
+// 저장돼 있으면 이 순서와 무관하게 그 과목이 우선 선택됩니다 — populateSubjectSelect()
+// 참고.
 const SUBJECTS = [
-  { id: "articulation", name: "조음음운장애",     weekStart: 0, weeks: 15, sections: ["A", "B"] },
-  { id: "anatomy",      name: "언어기관해부생리", weekStart: 0, weeks: 15, sections: ["A", "B"] }
+  { id: "anatomy",      name: "언어기관해부생리", weekStart: 0, weeks: 15, sections: ["A", "B"] },
+  { id: "articulation", name: "조음음운장애",     weekStart: 0, weeks: 15, sections: ["A", "B"] }
 ];
