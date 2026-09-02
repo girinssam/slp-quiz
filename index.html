@@ -393,6 +393,9 @@ body::before {
 .week-card.approved .week-status { color: var(--primary-dark); }
 .week-card.exam { border-color: var(--exam); background: var(--exam-soft); }
 .week-card.exam .week-status { color: var(--exam); }
+.week-card .week-deadline { font-size: 0.68rem; color: var(--gray-500); margin-top: 4px; }
+.week-card.clickable { cursor: pointer; }
+.week-card.clickable:hover { filter: brightness(0.97); }
 
 /* ===== 주차 유형 세그먼트(일반/시험기간) ===== */
 .segmented { display: flex; border: 1.5px solid var(--line); border-radius: 999px; overflow: hidden; }
@@ -1183,6 +1186,13 @@ body::before {
       <div id="atab-deadline" class="admin-panel">
         <div class="card">
           <div class="card-title">주차별 기한 설정</div>
+          <div class="deadline-field">
+            <label>분반</label>
+            <div class="segmented" id="deadlineClassToggle">
+              <button type="button" class="segmented-btn active" data-value="A" onclick="setDeadlineClass('A')">A반</button>
+              <button type="button" class="segmented-btn" data-value="B" onclick="setDeadlineClass('B')">B반</button>
+            </div>
+          </div>
           <div id="deadlineSettingsList"></div>
           <button class="btn btn-secondary btn-sm mt-8" onclick="loadDeadlineSettings()">새로고침</button>
         </div>
@@ -1219,6 +1229,7 @@ body::before {
 // Global State
 // =============================================
 let deadlinesCache = [];
+let deadlineSettingsClass = "A";
 let adminToken = "";
 let quizData = [];
 let quizAnswers = [];
@@ -1514,12 +1525,20 @@ function populateWeekDropdowns() {
 
 // =============================================
 // API Call — POST + text/plain (GAS CORS 우회)
-// 네트워크 오류/타임아웃 시 최대 2회(총 3회) 자동 재시도, 재시도 사이 1초 대기.
-// 서버가 명확히 응답한 오류(data.success===false)는 재시도하지 않고 즉시 반환.
+// 두 가지 별도 재시도 예산을 둔다:
+//  1) 네트워크 오류/타임아웃: 최대 2회(총 3회) 자동 재시도, 재시도 사이 1초 대기.
+//  2) 서버의 "잠금 시간초과"(접속 몰림) 오류: 최대 3회, 지수 백오프(1초→2초→4초)로
+//     재시도해 몰린 요청이 자연스럽게 분산되게 한다.
+// 그 외 서버가 명확히 응답한 오류(data.success===false)는 재시도하지 않고 즉시 반환.
+// 타임아웃(API_TIMEOUT_MS)은 서버 잠금 대기(Code.gs, 30초)보다 넉넉히 길게 잡아,
+// 잠금 대기 중인 요청이 실제 응답을 받기 전에 클라이언트가 먼저 끊어버리지 않게 한다.
 // =============================================
-const API_TIMEOUT_MS = 15000;
+const API_TIMEOUT_MS = 35000;
 const API_MAX_ATTEMPTS = 3;
 const API_RETRY_DELAY_MS = 1000;
+const LOCK_RETRY_DELAYS_MS = [1000, 2000, 4000];
+const LOCK_TIMEOUT_PATTERN = /잠금 시간초과/;
+const LOCK_BUSY_MESSAGE = "지금 접속이 몰리고 있습니다. 잠시 후 다시 시도해주세요.";
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -1527,8 +1546,16 @@ async function api(params) {
   // 과목이 지정되지 않은 요청에는 현재 선택된 과목을 자동으로 붙인다.
   const body = (params.subject || !currentSubject) ? params : { ...params, subject: currentSubject.id };
 
-  for (let attempt = 1; attempt <= API_MAX_ATTEMPTS; attempt++) {
-    showSpinner(attempt > 1 ? "처리 중입니다... (최대 10초 소요)" : "최대 10초 소요됩니다...");
+  let networkAttempt = 0;
+  let lockRetry = 0;
+
+  while (true) {
+    networkAttempt++;
+    showSpinner(
+      lockRetry > 0 ? `접속이 몰리고 있습니다. 재시도 중입니다... (${lockRetry}/${LOCK_RETRY_DELAYS_MS.length})`
+      : networkAttempt > 1 ? "처리 중입니다... (최대 10초 소요)"
+      : "최대 10초 소요됩니다..."
+    );
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
@@ -1543,13 +1570,24 @@ async function api(params) {
       if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { isNetworkError: true });
 
       const data = await res.json();
-      if (!data.success && data.error) throw new Error(data.error); // 서버 응답 오류 — 재시도 대상 아님
+      if (!data.success && data.error) {
+        if (LOCK_TIMEOUT_PATTERN.test(data.error)) {
+          if (lockRetry < LOCK_RETRY_DELAYS_MS.length) {
+            const delay = LOCK_RETRY_DELAYS_MS[lockRetry];
+            lockRetry++;
+            await sleep(delay);
+            continue;
+          }
+          throw new Error(LOCK_BUSY_MESSAGE);
+        }
+        throw new Error(data.error); // 그 외 서버 응답 오류 — 재시도 대상 아님
+      }
       return data;
     } catch (e) {
       const isNetworkIssue = e.name === "AbortError" || e instanceof TypeError || e.isNetworkError;
       if (!isNetworkIssue) throw e; // 서버가 명확히 응답한 오류는 그대로 전달
 
-      if (attempt < API_MAX_ATTEMPTS) {
+      if (networkAttempt < API_MAX_ATTEMPTS) {
         await sleep(API_RETRY_DELAY_MS);
         continue;
       }
@@ -1565,8 +1603,9 @@ async function api(params) {
 // Deadlines
 // =============================================
 async function loadDeadlines() {
+  const cls = currentSubject && me.sec ? me.sec[currentSubject.id] : null;
   try {
-    const data = await api({ action: "getDeadlines" });
+    const data = await api(cls ? { action: "getDeadlines", class: cls } : { action: "getDeadlines" });
     deadlinesCache = data.deadlines || [];
     updateWeekDropdownWithDeadlines();
     updateQuizWeekDropdown();
@@ -1592,7 +1631,7 @@ function updateWeekDropdownWithDeadlines() {
       opt.textContent = `${weekLabel(d.week)} (마감)`;
       opt.disabled = true;
     } else {
-      opt.textContent = `${weekLabel(d.week)}${d.deadline_date ? ` (~${formatDate(d.deadline_date)})` : ''}`;
+      opt.textContent = `${weekLabel(d.week)}${d.deadline_date ? ` (제출마감 ${formatDate(d.deadline_date)})` : ''}`;
     }
     sel.appendChild(opt);
   });
@@ -1610,9 +1649,11 @@ function updateQuizWeekDropdown() {
     if (d.week_type === "exam") {
       opt.textContent = `${weekLabel(d.week)} (시험기간)`;
       opt.disabled = true;
+    } else if (!d.quiz_is_open) {
+      opt.textContent = `${weekLabel(d.week)} (응시 마감)`;
+      opt.disabled = true;
     } else {
-      opt.textContent = d.quiz_is_open ? weekLabel(d.week) : `${weekLabel(d.week)} (응시 마감)`;
-      opt.disabled = !d.quiz_is_open;
+      opt.textContent = `${weekLabel(d.week)}${d.quiz_deadline_date ? ` (응시마감 ${formatDate(d.quiz_deadline_date)})` : ''}`;
     }
     sel.appendChild(opt);
   });
@@ -1756,8 +1797,11 @@ function renderSubmissionGrid(statusList) {
     } else {
       cardCls = "week-card closed"; label = "마감";
     }
-    card.className = cardCls;
-    card.innerHTML = `<div class="week-num">${weekLabel(s.week)}</div><div class="week-status">${label}</div>`;
+    const dlHtml = (s.state !== "submitted" && s.deadline) ? `<div class="week-deadline">~${formatDate(s.deadline)}</div>` : "";
+    if (s.state === "submitted") card.className = cardCls + " clickable";
+    else card.className = cardCls;
+    card.innerHTML = `<div class="week-num">${weekLabel(s.week)}</div><div class="week-status">${label}</div>${dlHtml}`;
+    if (s.state === "submitted") card.onclick = () => showSubmissionDetail(s.week);
     grid.appendChild(card);
   });
 }
@@ -1776,17 +1820,84 @@ function renderQuizGrid(statusList, cls) {
     } else if (s.quizDone) {
       cardCls = "week-card submitted";
       label = s.attempts > 1
-        ? `첫 ${s.firstScore}/${s.firstTotal} · 최근 ${s.lastScore}/${s.lastTotal} · ${s.attempts}회 응시`
+        ? `${s.attempts}회 응시, 최고 ${s.bestScore}/${s.bestTotal}점`
         : `${s.lastScore}/${s.lastTotal}점`;
     } else if (!s.quiz_is_open) {
       cardCls = "week-card closed"; label = "응시마감";
     } else {
       cardCls = "week-card not-submitted"; label = "미응시";
     }
-    card.className = cardCls;
-    card.innerHTML = `<div class="week-num">${weekLabel(s.week)}</div><div class="week-status">${label}</div>`;
+    const dlHtml = (hasQuiz && !s.quizDone && s.quiz_deadline) ? `<div class="week-deadline">~${formatDate(s.quiz_deadline)}</div>` : "";
+    card.className = s.quizDone ? cardCls + " clickable" : cardCls;
+    card.innerHTML = `<div class="week-num">${weekLabel(s.week)}</div><div class="week-status">${label}</div>${dlHtml}`;
+    if (s.quizDone) card.onclick = () => showQuizAttempts(s.week);
     grid.appendChild(card);
   });
+}
+
+// 문제 제출 현황 카드 클릭 → 본인이 그 주차에 제출한 문제 상세를 팝업으로 표시
+async function showSubmissionDetail(week) {
+  if (meVerifiedSubject !== (currentSubject && currentSubject.id)) return;
+  const cls = me.sec[currentSubject.id];
+  try {
+    const data = await api({ action: "getMySubmissionDetail", name: me.name, student_id: me.no, class: cls, week });
+    const sub = data.submission;
+    if (!sub) return showToast("해당 주차에 제출한 문제가 없습니다.", "info");
+    const statusInfo = { approved: ["승인", "result-correct"], rejected: ["반려", "result-wrong"] }[sub.status] || ["검토 대기", "result-pending"];
+    const choicesHtml = sub.choices ? `<div class="result-ans">보기: ${escHtml(sub.choices)}</div>` : "";
+    const noteHtml = sub.professor_note ? `<div class="result-exp">교수자 메모: ${escHtml(sub.professor_note)}</div>` : "";
+    const html = `<div class="result-item"><div class="result-details">
+      <div class="result-q">[${escHtml(sub.question_type)}] ${escHtml(sub.question)}</div>
+      ${choicesHtml}
+      <div class="result-ans">정답: ${escHtml(sub.answer)}</div>
+      ${sub.explanation ? `<div class="result-exp">해설: ${escHtml(sub.explanation)}</div>` : ""}
+      <div class="mt-8"><span class="${statusInfo[1]}">${statusInfo[0]}</span></div>
+      ${noteHtml}
+    </div></div>`;
+    openModal(`${weekLabel(week)} 제출 내용`, html);
+  } catch (e) { showToast(e.message, "error"); }
+}
+
+// 퀴즈 응시 현황 카드 클릭 → 본인의 그 주차 전체 응시 회차 목록을 표시하고,
+// 회차를 고르면 문항별 답안/정답/정오/해설을 펼쳐 보여준다.
+let myQuizAttemptsCache = [];
+async function showQuizAttempts(week) {
+  if (meVerifiedSubject !== (currentSubject && currentSubject.id)) return;
+  const cls = me.sec[currentSubject.id];
+  try {
+    const data = await api({ action: "getMyQuizAttempts", name: me.name, student_id: me.no, class: cls, week });
+    const attempts = data.attempts || [];
+    if (!attempts.length) return showToast("해당 주차에 응시한 퀴즈가 없습니다.", "info");
+    myQuizAttemptsCache = attempts;
+    const btnsHtml = attempts.map(a =>
+      `<button class="btn btn-secondary btn-sm" id="qa-btn-${a.attempt_number}" onclick="showQuizAttemptDetail(${a.attempt_number})">${a.attempt_number}회 · ${a.score}/${a.total}점</button>`
+    ).join(' ');
+    const html = `<div class="flex gap-8 flex-wrap" style="margin-bottom:12px">${btnsHtml}</div><div id="quizAttemptDetailInner"></div>`;
+    openModal(`${weekLabel(week)} 퀴즈 응시 기록 (${attempts.length}회)`, html);
+    showQuizAttemptDetail(attempts[attempts.length - 1].attempt_number);
+  } catch (e) { showToast(e.message, "error"); }
+}
+
+function showQuizAttemptDetail(attemptNumber) {
+  const a = myQuizAttemptsCache.find(x => x.attempt_number === attemptNumber);
+  const el = document.getElementById("quizAttemptDetailInner");
+  if (!a || !el) return;
+  document.querySelectorAll('[id^="qa-btn-"]').forEach(b => b.classList.toggle("btn-primary", b.id === `qa-btn-${attemptNumber}`));
+
+  el.innerHTML = `<div style="font-size:0.8rem;color:var(--gray-500);margin-bottom:8px">${formatDate(a.timestamp)}</div>` +
+    a.items.map((it, i) => {
+      const statusHtml = it.pending
+        ? '<span class="result-pending">교수자 확인중</span>'
+        : (it.correct ? '<span class="result-correct">정답</span>' : '<span class="result-wrong">오답</span>');
+      return `<div class="result-item">
+        <div class="result-details">
+          <div class="result-q">${i + 1}. [${escHtml(it.question_type)}] ${escHtml(it.question)}</div>
+          <div class="result-ans">내 답: <strong>${escHtml(it.my_answer || '(없음)')}</strong> / 정답: ${escHtml(it.correct_answer)}</div>
+          <div class="mt-8">${statusHtml}</div>
+          ${it.explanation ? `<div class="result-exp">${escHtml(it.explanation)}</div>` : ""}
+        </div>
+      </div>`;
+    }).join('');
 }
 
 // =============================================
@@ -2213,8 +2324,8 @@ async function addProfQuestion() {
   }
 
   try {
-    await api({ action:"adminAddQuestion", token:adminToken, week, question_type:type, question, choices, answer, explanation });
-    showToast("교수자 문제가 추가되었습니다.", "success");
+    const res = await api({ action:"adminAddQuestion", token:adminToken, week, question_type:type, question, choices, answer, explanation });
+    showToast(res.message || "교수자 문제가 추가되었습니다.", "success");
     document.getElementById("profQuestion").value = "";
     document.getElementById("profExplanation").value = "";
     [1,2,3,4].forEach(i => { const el=document.getElementById(`pch${i}`); if(el) el.value=""; });
@@ -2807,9 +2918,16 @@ async function adminBackup() {
 }
 
 // ===== Deadline Settings =====
+function setDeadlineClass(cls) {
+  deadlineSettingsClass = cls;
+  const wrap = document.getElementById("deadlineClassToggle");
+  if (wrap) wrap.querySelectorAll(".segmented-btn").forEach(b => b.classList.toggle("active", b.dataset.value === cls));
+  loadDeadlineSettings();
+}
+
 async function loadDeadlineSettings() {
   try {
-    const data = await api({ action:"getDeadlines" });
+    const data = await api({ action:"getDeadlines", class: deadlineSettingsClass });
     deadlinesCache = data.deadlines || [];
     renderDeadlineSettings();
   } catch(e) { showToast(e.message, "error"); }
@@ -2823,7 +2941,7 @@ function renderDeadlineSettings() {
     const quizVal = d.quiz_deadline_date ? d.quiz_deadline_date.replace(" ","T").substring(0,16) : "";
     const isExam = d.week_type === "exam";
     return `<div class="deadline-card">
-      <div class="deadline-card-title">${weekLabel(d.week)}</div>
+      <div class="deadline-card-title">${weekLabel(d.week)} · ${deadlineSettingsClass}반</div>
       <div class="deadline-field">
         <label>주차 유형</label>
         <div class="segmented" id="dl-type-${d.week}">
@@ -2874,13 +2992,14 @@ async function saveDeadline(week) {
       action: "adminSetDeadline",
       token: adminToken,
       week,
+      class: deadlineSettingsClass,
       deadline_date: subVal ? subVal.replace("T"," ") + ":00" : "",
       is_open: subOpen,
       quiz_deadline_date: quizVal ? quizVal.replace("T"," ") + ":00" : "",
       quiz_is_open: quizOpen,
       week_type: weekType
     });
-    showToast(`${weekLabel(week)} 기한이 저장되었습니다.`, "success");
+    showToast(`${weekLabel(week)} ${deadlineSettingsClass}반 기한이 저장되었습니다.`, "success");
     loadDeadlineSettings();
   } catch(e) { showToast(e.message, "error"); }
 }
