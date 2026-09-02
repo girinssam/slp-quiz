@@ -74,6 +74,7 @@
   --wait:#E8A33D; --wait-soft:#FBF0DF;
   --bad:#E0698A; --bad-soft:#FBE8ED;
   --off:#B9BED6;
+  --exam:#8B6FEA; --exam-soft:#EFE9FE;
   --radius-xl:24px; --radius-lg:20px; --radius-md:14px;
   --shadow:0 12px 34px rgba(48,55,120,.07);
 
@@ -390,6 +391,17 @@ body::before {
 .week-card.has-quiz .week-status { color: var(--primary-dark); }
 .week-card.approved { border-color: var(--primary-dark); background: #E8F8F7; }
 .week-card.approved .week-status { color: var(--primary-dark); }
+.week-card.exam { border-color: var(--exam); background: var(--exam-soft); }
+.week-card.exam .week-status { color: var(--exam); }
+
+/* ===== 주차 유형 세그먼트(일반/시험기간) ===== */
+.segmented { display: flex; border: 1.5px solid var(--line); border-radius: 999px; overflow: hidden; }
+.segmented-btn {
+  flex: 1; padding: 8px 12px; border: none; background: transparent;
+  font-family: inherit; font-size: 0.85rem; font-weight: 600; color: var(--ink-2); cursor: pointer;
+}
+.segmented-btn.active { background: var(--primary); color: #fff; }
+.segmented-btn[data-value="exam"].active { background: var(--exam); }
 
 /* ===== Quiz UI ===== */
 #quizScreen, #quizResult { width: 100%; }
@@ -721,6 +733,7 @@ body::before {
 .chip-wait { background: var(--wait-soft); color: var(--wait); }
 .chip-off  { background: var(--line);      color: var(--off); }
 .chip-bad  { background: var(--bad-soft);  color: var(--bad); }
+.chip-exam { background: var(--exam-soft); color: var(--exam); }
 
 @media (max-width: 640px) {
   .week-grid { grid-template-columns: 1fr; }
@@ -923,6 +936,7 @@ body::before {
             <span class="chip chip-ok">제출완료</span>
             <span class="chip chip-wait">미제출</span>
             <span class="chip chip-off">마감</span>
+            <span class="chip chip-exam">시험기간</span>
           </div>
         </div>
         <div class="card">
@@ -932,6 +946,7 @@ body::before {
             <span class="chip chip-ok">응시완료 (재응시 가능)</span>
             <span class="chip chip-wait">미응시</span>
             <span class="chip chip-off">퀴즈없음/응시마감</span>
+            <span class="chip chip-exam">시험기간</span>
           </div>
         </div>
       </div>
@@ -1481,15 +1496,17 @@ function onIdentityReady() {
 
 function populateWeekDropdowns() {
   const selects = ["sub-week","quiz-week","adminReviewWeek","profWeek","publishWeek","resultWeek"];
+  const start = (currentSubject && currentSubject.weekStart) ?? 0;
+  const end = (currentSubject && currentSubject.weeks) ?? 15;
   selects.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     const hasAll = id === "adminReviewWeek" || id === "resultWeek";
     if (!hasAll) el.innerHTML = '<option value="">-- 주차를 선택하세요 --</option>';
-    for (let w = 1; w <= 15; w++) {
+    for (let w = start; w <= end; w++) {
       const opt = document.createElement("option");
       opt.value = w;
-      opt.textContent = `${w}주차`;
+      opt.textContent = weekLabel(w);
       el.appendChild(opt);
     }
   });
@@ -1568,11 +1585,14 @@ function updateWeekDropdownWithDeadlines() {
     opt.value = d.week;
     const deadline = d.deadline_date ? new Date(d.deadline_date) : null;
     const closed = !d.is_open || (deadline && now > deadline);
-    if (closed) {
-      opt.textContent = `${d.week}주차 (마감)`;
+    if (d.week_type === "exam") {
+      opt.textContent = `${weekLabel(d.week)} (시험기간)`;
+      opt.disabled = true;
+    } else if (closed) {
+      opt.textContent = `${weekLabel(d.week)} (마감)`;
       opt.disabled = true;
     } else {
-      opt.textContent = `${d.week}주차${d.deadline_date ? ` (~${formatDate(d.deadline_date)})` : ''}`;
+      opt.textContent = `${weekLabel(d.week)}${d.deadline_date ? ` (~${formatDate(d.deadline_date)})` : ''}`;
     }
     sel.appendChild(opt);
   });
@@ -1587,8 +1607,13 @@ function updateQuizWeekDropdown() {
   deadlinesCache.filter(d => cls === 'A' ? d.hasQuizA : d.hasQuizB).forEach(d => {
     const opt = document.createElement("option");
     opt.value = d.week;
-    opt.textContent = d.quiz_is_open ? `${d.week}주차` : `${d.week}주차 (응시 마감)`;
-    opt.disabled = !d.quiz_is_open;
+    if (d.week_type === "exam") {
+      opt.textContent = `${weekLabel(d.week)} (시험기간)`;
+      opt.disabled = true;
+    } else {
+      opt.textContent = d.quiz_is_open ? weekLabel(d.week) : `${weekLabel(d.week)} (응시 마감)`;
+      opt.disabled = !d.quiz_is_open;
+    }
     sel.appendChild(opt);
   });
 }
@@ -1597,6 +1622,11 @@ function formatDate(s) {
   if (!s) return "";
   const d = new Date(s);
   return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+// 0번 주차는 정식 주차가 아니라 "테스트 주차"로 표시한다 (config.js의 weekStart 참고).
+function weekLabel(w) {
+  return Number(w) === 0 ? "테스트 주차" : `${w}주차`;
 }
 
 // =============================================
@@ -1717,7 +1747,9 @@ function renderSubmissionGrid(statusList) {
   statusList.forEach(s => {
     const card = document.createElement("div");
     let cardCls, label;
-    if (s.state === "submitted") {
+    if (s.week_type === "exam" && s.state !== "submitted") {
+      cardCls = "week-card exam"; label = "시험기간";
+    } else if (s.state === "submitted") {
       cardCls = "week-card submitted"; label = "제출완료";
     } else if (s.state === "not_submitted") {
       cardCls = "week-card not-submitted"; label = "미제출";
@@ -1725,7 +1757,7 @@ function renderSubmissionGrid(statusList) {
       cardCls = "week-card closed"; label = "마감";
     }
     card.className = cardCls;
-    card.innerHTML = `<div class="week-num">${s.week}주차</div><div class="week-status">${label}</div>`;
+    card.innerHTML = `<div class="week-num">${weekLabel(s.week)}</div><div class="week-status">${label}</div>`;
     grid.appendChild(card);
   });
 }
@@ -1737,7 +1769,9 @@ function renderQuizGrid(statusList, cls) {
     const hasQuiz = cls === 'A' ? s.hasQuizA : s.hasQuizB;
     const card = document.createElement("div");
     let cardCls, label;
-    if (!hasQuiz) {
+    if (s.week_type === "exam" && !s.quizDone) {
+      cardCls = "week-card exam"; label = "시험기간";
+    } else if (!hasQuiz) {
       cardCls = "week-card closed"; label = "퀴즈없음";
     } else if (s.quizDone) {
       cardCls = "week-card submitted";
@@ -1750,7 +1784,7 @@ function renderQuizGrid(statusList, cls) {
       cardCls = "week-card not-submitted"; label = "미응시";
     }
     card.className = cardCls;
-    card.innerHTML = `<div class="week-num">${s.week}주차</div><div class="week-status">${label}</div>`;
+    card.innerHTML = `<div class="week-num">${weekLabel(s.week)}</div><div class="week-status">${label}</div>`;
     grid.appendChild(card);
   });
 }
@@ -2055,15 +2089,17 @@ function adminLogout() {
 }
 
 function populateAdminWeekDropdowns() {
+  const start = (currentSubject && currentSubject.weekStart) ?? 0;
+  const end = (currentSubject && currentSubject.weeks) ?? 15;
   ["adminReviewWeek","profWeek","publishWeek","resultWeek"].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     const hasAll = id === "adminReviewWeek" || id === "resultWeek";
     el.innerHTML = hasAll ? '<option value="">전체 주차</option>' : '<option value="">-- 주차 선택 --</option>';
-    for (let w = 1; w <= 15; w++) {
+    for (let w = start; w <= end; w++) {
       const opt = document.createElement("option");
       opt.value = w;
-      opt.textContent = `${w}주차`;
+      opt.textContent = weekLabel(w);
       el.appendChild(opt);
     }
   });
@@ -2094,7 +2130,7 @@ function renderAdminSubmissions(list) {
 
     return `<div class="submission-item">
       <div class="submission-header">
-        <span class="submission-meta">${s.week}주차 · ${s.name} (${s.student_id}) · ${s.class}반 · <strong>${s.question_type}</strong></span>
+        <span class="submission-meta">${weekLabel(s.week)} · ${s.name} (${s.student_id}) · ${s.class}반 · <strong>${s.question_type}</strong></span>
         ${statusBadge}
       </div>
       <div class="form-group">
@@ -2204,7 +2240,7 @@ async function loadQuizPreview() {
         <strong>${i+1}. [${q.question_type}]</strong> ${escHtml(q.question)}
         <div style="margin-top:4px;color:var(--gray-600)">정답: ${escHtml(q.answer)} · 제출자: ${escHtml(q.name)}</div>
       </div>`).join('');
-    document.getElementById("publishBtn").textContent = `${week}주차 ${cls}반 퀴즈 게시`;
+    document.getElementById("publishBtn").textContent = `${weekLabel(week)} ${cls}반 퀴즈 게시`;
     document.getElementById("publishBtnWrap").classList.remove("hidden");
   } catch(e) { showToast(e.message, "error"); }
 }
@@ -2336,7 +2372,7 @@ function showResultDetail(row) {
   modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;overflow-y:auto;padding:20px";
   modal.innerHTML = `<div style="max-width:560px;margin:0 auto;background:white;border-radius:12px;padding:20px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <strong>${escHtml(r.name)} (${r.week}주차 · ${r.attempt_number}회) 상세 답안</strong>
+      <strong>${escHtml(r.name)} (${weekLabel(r.week)} · ${r.attempt_number}회) 상세 답안</strong>
       <button class="btn btn-secondary btn-sm" onclick="this.closest('[style]').remove()">닫기</button>
     </div>
     <div id="resultDetailInner">${html}</div>
@@ -2471,13 +2507,13 @@ function renderNonSubmitters(type) {
   const label = type === "quiz" ? "퀴즈 미응시" : "문제 미제출";
 
   if (!data.list.length) {
-    el.innerHTML = `<p style="color:var(--gray-500);font-size:0.85rem;margin-bottom:14px">${data.week}주차 ${data.cls}반 ${label}자가 없습니다.</p>`;
+    el.innerHTML = `<p style="color:var(--gray-500);font-size:0.85rem;margin-bottom:14px">${weekLabel(data.week)} ${data.cls}반 ${label}자가 없습니다.</p>`;
     return;
   }
 
   el.innerHTML = `
     <div class="deadline-card">
-      <div class="deadline-card-title">${data.week}주차 ${data.cls}반 ${label}자 (${data.list.length}명)</div>
+      <div class="deadline-card-title">${weekLabel(data.week)} ${data.cls}반 ${label}자 (${data.list.length}명)</div>
       <div style="font-size:0.85rem;color:var(--gray-700);margin-bottom:10px">${data.list.map(s => `${escHtml(s.name)}(${escHtml(s.student_id)})`).join(", ")}</div>
       <button class="btn btn-secondary btn-sm" onclick="copyNonSubmitters('${type}')">미제출자 명단 복사</button>
     </div>`;
@@ -2487,7 +2523,7 @@ function copyNonSubmitters(type) {
   const data = nonSubmittersCache[type];
   if (!data || !data.list.length) return showToast("복사할 명단이 없습니다.", "info");
   const label = type === "quiz" ? "퀴즈" : "문제";
-  const text = `${data.week}주차 ${label} 미제출: ${data.list.map(s => s.name).join(", ")}`;
+  const text = `${weekLabel(data.week)} ${label} 미제출: ${data.list.map(s => s.name).join(", ")}`;
   navigator.clipboard.writeText(text)
     .then(() => showToast("클립보드에 복사되었습니다.", "success"))
     .catch(() => showToast("복사에 실패했습니다.", "error"));
@@ -2664,16 +2700,23 @@ function renderStudentDetail(data) {
   const el = document.getElementById("studentDetailEl");
   if (!el) return;
 
-  const subGrid = data.weeks.map(w => `
-    <div class="week-card ${w.submitted ? "submitted" : "not-submitted"}">
-      <div class="week-num">${w.week}주차</div>
+  const subGrid = data.weeks.map(w => {
+    if (w.week_type === "exam" && !w.submitted) {
+      return `<div class="week-card exam"><div class="week-num">${weekLabel(w.week)}</div><div class="week-status">시험기간</div></div>`;
+    }
+    return `<div class="week-card ${w.submitted ? "submitted" : "not-submitted"}">
+      <div class="week-num">${weekLabel(w.week)}</div>
       <div class="week-status">${w.submitted ? "제출" : "미제출"}</div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   const quizGrid = data.weeks.map(w => {
     const has = w.attempts > 0;
+    if (w.week_type === "exam" && !has) {
+      return `<div class="week-card exam"><div class="week-num">${weekLabel(w.week)}</div><div class="week-status">시험기간</div></div>`;
+    }
     return `<div class="week-card ${has ? "submitted" : "closed"}">
-      <div class="week-num">${w.week}주차</div>
+      <div class="week-num">${weekLabel(w.week)}</div>
       <div class="week-status">${has ? `${w.lastScore}/${w.lastTotal}점` : "미응시"}</div>
     </div>`;
   }).join("");
@@ -2713,7 +2756,7 @@ function showStudentSubmissions() {
     const badgeCls = s.status === "approved" ? "badge-success" : s.status === "rejected" ? "badge-danger" : "badge-gray";
     return `<div class="result-item">
       <div class="result-details">
-        <div class="result-q">${w.week}주차 · [${escHtml(s.question_type || "")}] <span class="badge ${badgeCls}">${escHtml(s.status || "")}</span></div>
+        <div class="result-q">${weekLabel(w.week)} · [${escHtml(s.question_type || "")}] <span class="badge ${badgeCls}">${escHtml(s.status || "")}</span></div>
         <div class="result-q">${escHtml(s.question)}</div>
         ${s.choices ? `<div class="result-ans">보기: ${escHtml(s.choices)}</div>` : ""}
         <div class="result-ans">정답: ${escHtml(s.answer || "")}</div>
@@ -2738,7 +2781,7 @@ function showStudentRawResponses() {
     }).join("");
     return `<div class="result-item">
       <div class="result-details">
-        <div class="result-q">${w.week}주차 · ${r.attempt_number}회 시도 · ${escHtml(r.timestamp)} · ${r.score}/${r.total}점</div>
+        <div class="result-q">${weekLabel(w.week)} · ${r.attempt_number}회 시도 · ${escHtml(r.timestamp)} · ${r.score}/${r.total}점</div>
         ${itemsHtml}
       </div>
     </div>`;
@@ -2778,8 +2821,16 @@ function renderDeadlineSettings() {
   el.innerHTML = deadlinesCache.map(d => {
     const subVal = d.deadline_date ? d.deadline_date.replace(" ","T").substring(0,16) : "";
     const quizVal = d.quiz_deadline_date ? d.quiz_deadline_date.replace(" ","T").substring(0,16) : "";
+    const isExam = d.week_type === "exam";
     return `<div class="deadline-card">
-      <div class="deadline-card-title">${d.week}주차</div>
+      <div class="deadline-card-title">${weekLabel(d.week)}</div>
+      <div class="deadline-field">
+        <label>주차 유형</label>
+        <div class="segmented" id="dl-type-${d.week}">
+          <button type="button" class="segmented-btn ${!isExam ? "active" : ""}" data-value="normal" onclick="setWeekTypeUI(${d.week}, 'normal')">일반</button>
+          <button type="button" class="segmented-btn ${isExam ? "active" : ""}" data-value="exam" onclick="setWeekTypeUI(${d.week}, 'exam')">시험기간 (퀴즈 없음)</button>
+        </div>
+      </div>
       <div class="deadline-field">
         <label>문제 제출 기한</label>
         <div class="flex gap-8">
@@ -2805,11 +2856,19 @@ function renderDeadlineSettings() {
   }).join('') || '<p style="color:var(--gray-500)">기한 정보가 없습니다.</p>';
 }
 
+// 주차 유형(일반/시험기간) 세그먼트 버튼의 선택 상태만 토글한다. 실제 저장은 saveDeadline()에서.
+function setWeekTypeUI(week, type) {
+  const wrap = document.getElementById(`dl-type-${week}`);
+  if (!wrap) return;
+  wrap.querySelectorAll(".segmented-btn").forEach(b => b.classList.toggle("active", b.dataset.value === type));
+}
+
 async function saveDeadline(week) {
   const subVal   = document.getElementById(`dl-sub-${week}`)?.value;
   const subOpen  = document.getElementById(`dl-sub-open-${week}`)?.value;
   const quizVal  = document.getElementById(`dl-quiz-${week}`)?.value;
   const quizOpen = document.getElementById(`dl-quiz-open-${week}`)?.value;
+  const weekType = document.getElementById(`dl-type-${week}`)?.querySelector(".segmented-btn.active")?.dataset.value || "normal";
   try {
     await api({
       action: "adminSetDeadline",
@@ -2818,9 +2877,10 @@ async function saveDeadline(week) {
       deadline_date: subVal ? subVal.replace("T"," ") + ":00" : "",
       is_open: subOpen,
       quiz_deadline_date: quizVal ? quizVal.replace("T"," ") + ":00" : "",
-      quiz_is_open: quizOpen
+      quiz_is_open: quizOpen,
+      week_type: weekType
     });
-    showToast(`${week}주차 기한이 저장되었습니다.`, "success");
+    showToast(`${weekLabel(week)} 기한이 저장되었습니다.`, "success");
     loadDeadlineSettings();
   } catch(e) { showToast(e.message, "error"); }
 }

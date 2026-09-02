@@ -15,7 +15,12 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbwR1rxyuvh83mxnzCuNJbhb
 // 표시하며(기존 라디오 버튼 표기와 동일한 규칙), 시트/제출 데이터도 항상 이
 // 코드로 저장·비교합니다. 라벨이 아니라 코드로 통일해야 기존에 쌓인
 // submissions/quizzes/results 데이터(class 값이 전부 "A"/"B")와 어긋나지 않습니다.
+// weekStart~weeks: 주차 드롭다운/그리드에 노출할 범위. weekStart를 0으로 두면
+// 정식 1~weeks주차 앞에 "테스트 주차"(0번)가 추가로 노출됩니다(화면 표시는
+// weekLabel()이 "0주차" 대신 "테스트 주차"로 바꿔줍니다). 서버(Code.gs)는 이
+// 범위를 참조하지 않고 항상 0~15를 다루므로, 여기서 weeks를 늘려도 Code.gs의
+// 루프 상한(15)도 함께 맞춰야 합니다.
 const SUBJECTS = [
-  { id: "articulation", name: "조음음운장애",     weeks: 15, sections: ["A", "B"] },
-  { id: "anatomy",      name: "언어기관해부생리", weeks: 15, sections: ["A", "B"] }
+  { id: "articulation", name: "조음음운장애",     weekStart: 0, weeks: 15, sections: ["A", "B"] },
+  { id: "anatomy",      name: "언어기관해부생리", weekStart: 0, weeks: 15, sections: ["A", "B"] }
 ];
