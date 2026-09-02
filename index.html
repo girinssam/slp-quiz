@@ -167,15 +167,15 @@ body::before {
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 14px;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   min-height: 1.4em;
 }
 .id-status-neutral { color: var(--muted); }
 .id-status-bad { color: var(--bad); }
 .id-status-ok { color: var(--ok); }
-.id-hint { margin-top: 12px; font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
-.id-privacy { margin-top: 6px; font-size: 0.72rem; color: var(--muted); line-height: 1.5; }
+.id-hint { margin-top: 12px; font-size: 0.9375rem; color: var(--muted); line-height: 1.5; }
+.id-privacy { margin-top: 6px; font-size: 0.9375rem; color: var(--muted); line-height: 1.5; }
 
 #studentTabs.locked { opacity: .5; pointer-events: none; }
 
@@ -195,7 +195,7 @@ body::before {
   border: none;
   background: transparent;
   border-radius: 9px;
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 600;
   color: var(--gray-600);
   cursor: pointer;
@@ -224,7 +224,7 @@ body::before {
   margin-bottom: 16px;
 }
 .card-title {
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--gray-800);
   margin-bottom: 20px;
@@ -662,7 +662,7 @@ body::before {
 .footer {
   text-align: center;
   padding: 20px;
-  font-size: 0.78rem;
+  font-size: 0.9375rem;
   color: var(--gray-500);
   border-top: 1px solid var(--gray-200);
   background: var(--surface);
@@ -744,7 +744,7 @@ body::before {
 @media (max-width: 480px) {
   .result-row { grid-template-columns: 1fr 1fr; font-size: 14px; }
   .header h1 { font-size: 1.1rem; }
-  .tab-btn { font-size: 15px; padding: 12px 4px; }
+  .tab-btn { font-size: 16px; padding: 12px 4px; }
   .card { padding: 20px; }
   .btn { padding: 16px 20px; font-size: 18px; }
   .radio-label { padding: 10px 14px; font-size: 16px; }
@@ -873,7 +873,7 @@ body::before {
             <div class="form-group">
               <label class="form-label">모범답안</label>
               <textarea id="sub-answer-text" class="form-textarea" placeholder="모범답안을 입력하세요"></textarea>
-              <div style="font-size:0.78rem;color:var(--gray-500);margin-top:4px">단답형은 <code>/</code>로 복수 정답 입력 가능 (예: 파열음/폐쇄음)</div>
+              <div style="font-size:0.9375rem;color:var(--gray-500);margin-top:4px">단답형은 <code>/</code>로 복수 정답 입력 가능 (예: 파열음/폐쇄음)</div>
             </div>
           </div>
 
@@ -884,7 +884,7 @@ body::before {
         </div>
 
         <button class="btn btn-primary btn-full mt-16" id="submitQuestionBtn" onclick="submitQuestion()">제출하기</button>
-        <div style="font-size:0.78rem;color:var(--gray-500);margin-top:8px;text-align:center">마감 전까지 재제출하면 이전 문제를 대체합니다.</div>
+        <div style="font-size:0.9375rem;color:var(--gray-500);margin-top:8px;text-align:center">마감 전까지 재제출하면 이전 문제를 대체합니다.</div>
       </div>
     </div>
 
@@ -1062,7 +1062,7 @@ body::before {
             <div class="form-group">
               <label class="form-label">모범답안</label>
               <textarea id="profAnswer" class="form-textarea" placeholder="모범답안"></textarea>
-              <div style="font-size:0.78rem;color:var(--gray-500);margin-top:4px">단답형은 <code>/</code>로 복수 정답 입력 가능 (예: 파열음/폐쇄음)</div>
+              <div style="font-size:0.9375rem;color:var(--gray-500);margin-top:4px">단답형은 <code>/</code>로 복수 정답 입력 가능 (예: 파열음/폐쇄음)</div>
             </div>
           </div>
           <div class="form-group">
@@ -2141,7 +2141,7 @@ function renderAdminSubmissions(list) {
       <div class="form-group">
         <label class="form-label">정답</label>
         <input type="text" class="form-input" id="s-ans-${s._row}" value="${escAttr(s.answer||'')}">
-        ${s.question_type === "단답형" ? '<div style="font-size:0.78rem;color:var(--gray-500);margin-top:4px">단답형은 <code>/</code>로 복수 정답 입력 가능 (예: 파열음/폐쇄음)</div>' : ''}
+        ${s.question_type === "단답형" ? '<div style="font-size:0.9375rem;color:var(--gray-500);margin-top:4px">단답형은 <code>/</code>로 복수 정답 입력 가능 (예: 파열음/폐쇄음)</div>' : ''}
       </div>
       <div class="form-group">
         <label class="form-label">해설 (선택)</label>
