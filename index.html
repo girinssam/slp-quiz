@@ -1334,7 +1334,9 @@ function onSubjectChange() {
   safeStorageSet(localStorage, SUBJ_KEY, next.id);
 
   updateSubjectDependentUI();
-  loadDeadlines();
+  // 새 과목에 저장된 본인 정보가 있으면 reverifyMe()의 응답에 마감정보가 함께 오고,
+  // 없으면 reverifyMe()가 곧바로 탭을 잠그므로(pointer-events:none) 별도로
+  // getDeadlines를 미리 부를 필요가 없다.
   reverifyMe();
   refreshVisibleAdminTab();
 }
@@ -1397,7 +1399,9 @@ document.addEventListener("DOMContentLoaded", () => {
   setIdStatus("neutral", "이름과 분반을 입력하면 수강 명단과 대조합니다.");
 
   if (location.hash === "#admin") showAdminView();
-  else loadDeadlines();
+  // 학생 탭은 위 lockStudentTabs()로 이미 잠겨 있고 본인 확인 전까지는(pointer-events:
+  // none) 화면에 실질적으로 노출되지 않으므로, 여기서 미리 getDeadlines를 부를 필요가
+  // 없다 — 확인이 성공하면 reverifyMe()의 응답에 마감정보가 함께 실려 온다.
   populateWeekDropdowns();
   autoTrimInputs();
   reverifyMe(); // 저장된 본인 정보가 있으면 서버에 다시 물어 검증한다 (신뢰하지 않고 재확인)
@@ -1478,7 +1482,7 @@ const ID_VERIFY_MESSAGES = {
   id_mismatch:   { kind: "bad", text: () => "이름과 학번이 서로 다릅니다. 다시 확인해주세요." }
 };
 
-function applyVerifyResult(name, result) {
+function applyVerifyResult(name, result, deadlines) {
   if (result.ok) {
     me.name = result.name;
     me.no = result.no;
@@ -1495,7 +1499,7 @@ function applyVerifyResult(name, result) {
 
     unlockStudentTabs();
     setIdStatus("ok", `${result.sec}반 ${result.name} 학생으로 확인되었습니다. 세 개 탭을 모두 이용할 수 있습니다.`);
-    onIdentityReady();
+    onIdentityReady(deadlines);
   } else {
     meVerifiedSubject = null;
     lockStudentTabs();
@@ -1526,7 +1530,7 @@ async function verifyIdentity() {
   if (btn) btn.disabled = true;
   try {
     const data = await api({ action: "verifyStudent", name, student_id: no, class: sec });
-    applyVerifyResult(name, data.result);
+    applyVerifyResult(name, data.result, data.deadlines);
   } catch (e) {
     setIdStatus("bad", e.message);
   } finally {
@@ -1557,7 +1561,7 @@ async function reverifyMe() {
   try {
     const data = await api({ action: "verifyStudent", name: me.name, student_id: me.no, class: sec });
     if (data.result.ok) {
-      applyVerifyResult(me.name, data.result);
+      applyVerifyResult(me.name, data.result, data.deadlines);
     } else {
       meVerifiedSubject = null;
       lockStudentTabs();
@@ -1571,8 +1575,11 @@ async function reverifyMe() {
 }
 
 // 본인 확인이 완료되면 현재 상태에 필요한 데이터를 자동으로 불러온다.
-function onIdentityReady() {
-  loadDeadlines();
+// deadlines가 이미 있으면(verifyStudent 응답에 함께 실려 온 경우) 그걸 바로 반영하고,
+// 없으면(예: 과거 캐시된 프런트 버전이 이 필드를 안 보내는 경우 대비) 직접 불러온다.
+function onIdentityReady(deadlines) {
+  if (deadlines) applyDeadlines(deadlines);
+  else loadDeadlines();
   reloadStatusIfReady();
   const statusTab = document.getElementById("tab-status");
   if (statusTab && statusTab.classList.contains("active")) loadStatus();
@@ -1740,12 +1747,18 @@ async function loadDeadlines() {
   const cls = currentSubject && me.sec ? me.sec[currentSubject.id] : null;
   try {
     const data = await api(cls ? { action: "getDeadlines", class: cls } : { action: "getDeadlines" });
-    deadlinesCache = data.deadlines || [];
-    updateWeekDropdownWithDeadlines();
-    updateQuizWeekDropdown();
+    applyDeadlines(data.deadlines);
   } catch (e) {
     showToast(e.message, "error");
   }
+}
+
+// verifyStudent 응답에 이미 마감정보가 실려 있을 때(apiVerifyStudent, Code.gs 참고)
+// 별도 getDeadlines 왕복 없이 그 값을 바로 반영한다.
+function applyDeadlines(list) {
+  deadlinesCache = list || [];
+  updateWeekDropdownWithDeadlines();
+  updateQuizWeekDropdown();
 }
 
 function updateWeekDropdownWithDeadlines() {
