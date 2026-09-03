@@ -1282,6 +1282,15 @@ let quizData = [];
 let quizAnswers = [];
 let currentQuestion = 0;
 let quizUser = {};
+// 이번 "제출 시도"를 식별하는 토큰. 같은 시도를 재시도/재제출할 때는 그대로 재사용해,
+// 서버가 같은 토큰의 결과가 이미 저장되어 있으면 새 행을 추가하지 않고 기존 결과를
+// 돌려주게 한다(gradeQuiz의 client_token 중복 방지, Code.gs 참고). 새로 퀴즈를
+// 시작하거나 "처음부터 풀기"를 선택할 때만 새로 발급한다.
+let quizSubmissionToken = null;
+function genSubmissionToken() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return "tok-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+}
 let adminResultsCache = [];
 let nonSubmittersCache = { question: null, quiz: null };
 
@@ -1618,7 +1627,12 @@ function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 // visibilitychange 핸들러) 이미 마감을 넘긴 요청은 그 자리에서 즉시 강제 중단시킨다.
 const inFlightRequests = new Set();
 
-async function api(params) {
+// opts.retryNetworkErrors=false: 네트워크 오류/타임아웃이어도 자동 재시도하지 않고
+// 즉시 실패를 알린다. gradeQuiz처럼 "서버에 도달했는지 안 했는지 알 수 없는" 상태에서
+// 같은 요청을 또 보내면 중복 저장(예: 퀴즈 재응시 행 중복)으로 이어질 수 있는 비멱등
+// 액션에 사용한다 — 호출부가 저장 여부를 직접 재확인한 뒤 필요할 때만 다시 보낸다.
+async function api(params, opts = {}) {
+  const retryNetworkErrors = opts.retryNetworkErrors !== false;
   // 과목이 지정되지 않은 요청에는 현재 선택된 과목을 자동으로 붙인다.
   const body = (params.subject || !currentSubject) ? params : { ...params, subject: currentSubject.id };
 
@@ -1671,7 +1685,7 @@ async function api(params) {
       const isNetworkIssue = e.name === "AbortError" || e instanceof TypeError || e.isNetworkError;
       if (!isNetworkIssue) throw e; // 서버가 명확히 응답한 오류는 그대로 전달
 
-      if (networkAttempt < API_MAX_ATTEMPTS && Date.now() + API_RETRY_DELAY_MS < overallDeadline) {
+      if (retryNetworkErrors && networkAttempt < API_MAX_ATTEMPTS && Date.now() + API_RETRY_DELAY_MS < overallDeadline) {
         await sleep(API_RETRY_DELAY_MS);
         continue;
       }
@@ -1684,16 +1698,30 @@ async function api(params) {
   }
 }
 
-// 화면이 다시 보이게 됐을 때, 마감 시각을 이미 넘긴(=백그라운드에서 타이머가 멈춰
-// 있었을 가능성이 높은) 요청을 강제로 중단시킨다. 중단되면 각 호출부의 catch가
-// 정상적으로 실행되어 스피너가 꺼지고, 필요하면 저장 여부 재확인 등 복구 로직이
-// 뒤이어 실행된다(예: submitQuiz의 handleGradeQuizFailure).
+// 화면이 짧게라도(5초 이상) 백그라운드에 있었다면, 그동안 setTimeout 기반 타이머가
+// 정상적으로 흘렀다고 신뢰할 수 없다(화면 꺼짐/앱 전환 시 브라우저가 타이머를 멈추는
+// 경우가 흔함 — 60초 총 타임아웃까지 기다리면 실기기 테스트에서 너무 늦게 반응했다).
+// 그래서 60초 마감 여부와 무관하게, 이 정도로 오래 숨어 있었다 돌아온 시점에 진행
+// 중이던 요청을 전부 즉시 강제 중단시킨다. 중단되면 각 호출부의 catch가 정상적으로
+// 실행되어 스피너가 꺼지고, 필요하면 저장 여부 재확인 등 복구 로직이 뒤이어 실행된다
+// (예: submitQuiz의 handleGradeQuizFailure). 아주 짧은 화면 전환(알림 확인 등)까지
+// 끊지 않도록 5초의 유예를 둔다.
+const VISIBILITY_RESUME_GRACE_MS = 5000;
+let hiddenAt = null;
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState !== "visible") return;
+  if (document.visibilityState === "hidden") {
+    hiddenAt = Date.now();
+    return;
+  }
+  const wasHiddenForMs = hiddenAt ? Date.now() - hiddenAt : 0;
+  hiddenAt = null;
+  if (inFlightRequests.size === 0) return;
+
   const now = Date.now();
+  const forceAll = wasHiddenForMs >= VISIBILITY_RESUME_GRACE_MS;
   let forcedAny = false;
   inFlightRequests.forEach(entry => {
-    if (now >= entry.deadlineAt) {
+    if (forceAll || now >= entry.deadlineAt) {
       forcedAny = true;
       try { entry.controller.abort(); } catch (e) { /* 무시 */ }
     }
@@ -2016,9 +2044,10 @@ function quizProgressKey(name, sid, cls, week) {
 function saveQuizProgress() {
   if (!quizUser || !quizUser.name) return;
   const key = quizProgressKey(quizUser.name, quizUser.sid, quizUser.cls, quizUser.week);
-  localStorage.setItem(key, JSON.stringify({ answers: quizAnswers, currentQuestion }));
+  localStorage.setItem(key, JSON.stringify({ answers: quizAnswers, currentQuestion, token: quizSubmissionToken }));
 }
 function clearQuizProgress() {
+  quizSubmissionToken = null; // 이 시도는 끝났으니(성공/재시작) 토큰도 함께 잊는다
   if (!quizUser || !quizUser.name) return;
   localStorage.removeItem(quizProgressKey(quizUser.name, quizUser.sid, quizUser.cls, quizUser.week));
 }
@@ -2052,6 +2081,7 @@ async function startQuiz() {
     } else {
       quizAnswers = new Array(quizData.length).fill(null);
       currentQuestion = 0;
+      quizSubmissionToken = genSubmissionToken();
       enterQuizScreen();
     }
   } catch(e) {
@@ -2084,6 +2114,9 @@ function showResumeChoice(saved) {
   document.getElementById("resumeContinueBtn").onclick = () => {
     quizAnswers = saved.answers;
     currentQuestion = Math.min(saved.currentQuestion || 0, quizData.length - 1);
+    // 같은 시도를 이어서 푸는 것이므로 토큰도 그대로 이어받는다 — 저장된 진행이
+    // 화면이 죽기 직전 제출까지 갔던 경우, 재제출해도 서버에서 중복으로 처리되지 않는다.
+    quizSubmissionToken = saved.token || genSubmissionToken();
     modal.remove();
     enterQuizScreen();
   };
@@ -2091,6 +2124,7 @@ function showResumeChoice(saved) {
     quizAnswers = new Array(quizData.length).fill(null);
     currentQuestion = 0;
     clearQuizProgress();
+    quizSubmissionToken = genSubmissionToken();
     modal.remove();
     enterQuizScreen();
   };
@@ -2192,14 +2226,21 @@ async function submitQuiz() {
   if (nextBtn) nextBtn.disabled = true;
   if (prevBtn) prevBtn.disabled = true;
   try {
+    // gradeQuiz는 멱등이 아니므로(호출마다 새 응시 행을 추가) 네트워크 오류 시 api()가
+    // 알아서 같은 요청을 또 보내게 두지 않는다(retryNetworkErrors:false) — "서버에
+    // 도달했는지 알 수 없는" 상태에서 무작정 재시도하면 그 자체로 중복 저장을 만들 수
+    // 있다. 대신 실패하면 handleGradeQuizFailure가 실제 저장 여부를 먼저 확인한다.
+    // client_token은 "이번 제출 시도"를 식별해, 같은 토큰으로 다시 요청이 들어와도
+    // 서버(gradeQuiz)가 새 행을 또 만들지 않고 기존 결과를 돌려주게 한다.
     const data = await api({
       action: "gradeQuiz",
       name: quizUser.name,
       student_id: quizUser.sid,
       class: quizUser.cls,
       week: quizUser.week,
-      answers: quizAnswers
-    });
+      answers: quizAnswers,
+      client_token: quizSubmissionToken
+    }, { retryNetworkErrors: false });
     clearQuizProgress();
     renderQuizResult(data.score, data.total, data.items);
   } catch (e) {
