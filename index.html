@@ -3220,8 +3220,8 @@ async function saveDeadline(week) {
 // =============================================
 // UI Helpers
 // =============================================
-// 동시에 여러 api() 호출이 겹칠 수 있으므로(예: 페이지 로드 시 loadDeadlines()와
-// reverifyMe()가 동시에 실행됨) 단순 on/off가 아니라 참조 카운트로 관리한다.
+// 동시에 여러 api() 호출이 겹칠 수 있으므로(예: 과목 전환 시 reverifyMe()와
+// refreshVisibleAdminTab()가 동시에 실행됨) 단순 on/off가 아니라 참조 카운트로 관리한다.
 // 그렇지 않으면 먼저 끝난 호출이 hideSpinner()를 부르는 순간, 아직 진행 중인 다른
 // 호출의 스피너까지 함께 꺼져버려 "로딩 중인지 알 수 없는" 상태가 된다.
 let spinnerRefCount = 0;
