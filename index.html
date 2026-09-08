@@ -571,6 +571,7 @@ body::before {
   color: var(--gray-700);
 }
 .review-choice-item.is-answer { background: var(--primary-light); font-weight: 600; color: var(--gray-800); }
+.review-choice-item.is-wrong-pick { background: #FFF0F0; color: #C92A2A; text-decoration: line-through; }
 .review-choice-num { flex-shrink: 0; font-weight: 700; }
 
 /* ===== 공용 모달 ===== */
@@ -609,9 +610,9 @@ body::before {
 
 .result-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto auto;
+  grid-template-columns: 1fr 1fr 1fr auto;
   gap: 8px;
-  align-items: center;
+  align-items: start;
   padding: 10px 12px;
   background: white;
   border: 1px solid var(--gray-200);
@@ -625,7 +626,10 @@ body::before {
   font-size: 0.78rem;
   color: var(--gray-700);
 }
-.result-attempts { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.result-scores { display: flex; flex-direction: column; gap: 2px; }
+.result-attempts { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.result-attempt-row { display: flex; align-items: center; gap: 6px; }
+.result-attempt-time { font-size: 0.7rem; color: var(--gray-500); white-space: nowrap; }
 
 /* ===== Deadline Settings ===== */
 .deadline-card {
@@ -2020,6 +2024,34 @@ function formatChoicesForReview(questionType, choicesStr, answer) {
   return { choicesHtml: "", answerText: escHtml(answer) };
 }
 
+// 퀴즈 응시 기록/관리자 결과 상세처럼 "내 답"과 "정답"을 함께 복습하는 화면에서 쓰는
+// 버전. 정답 보기는 강조, 오답을 골랐다면 그 보기도 표시해 무엇을 잘못 골랐는지
+// 바로 보이게 한다.
+function formatQuizChoicesForReview(questionType, choicesStr, myAnswer, correctAnswer) {
+  const nums = ["①","②","③","④"];
+  const label = (ans) => {
+    if (questionType !== "객관식" || !choicesStr) return escHtml(ans || "(없음)");
+    const choices = choicesStr.split("|");
+    const idx = Number(ans) - 1;
+    if (!ans || !choices[idx]) return escHtml(ans || "(없음)");
+    return `${nums[idx] || ans} ${escHtml(choices[idx])}`;
+  };
+
+  let choicesHtml = "";
+  if (questionType === "객관식" && choicesStr) {
+    const choices = choicesStr.split("|");
+    const correctIdx = Number(correctAnswer) - 1;
+    const myIdx = Number(myAnswer) - 1;
+    choicesHtml = `<ul class="review-choices">` + choices.map((ch, i) => {
+      let cls = "review-choice-item";
+      if (i === correctIdx) cls += " is-answer";
+      else if (i === myIdx) cls += " is-wrong-pick";
+      return `<li class="${cls}"><span class="review-choice-num">${nums[i] || (i + 1)}</span><span>${escHtml(ch)}</span></li>`;
+    }).join('') + `</ul>`;
+  }
+  return { choicesHtml, myAnswerText: label(myAnswer), correctAnswerText: label(correctAnswer) };
+}
+
 // 문제 제출 현황 카드 클릭 → 본인이 그 주차에 제출한 문제 상세를 팝업으로 표시
 async function showSubmissionDetail(week) {
   if (meVerifiedSubject !== (currentSubject && currentSubject.id)) return;
@@ -2074,10 +2106,12 @@ function showQuizAttemptDetail(attemptNumber) {
       const statusHtml = it.pending
         ? '<span class="result-pending">교수자 확인중</span>'
         : (it.correct ? '<span class="result-correct">정답</span>' : '<span class="result-wrong">오답</span>');
+      const { choicesHtml, myAnswerText, correctAnswerText } = formatQuizChoicesForReview(it.question_type, it.choices, it.my_answer, it.correct_answer);
       return `<div class="result-item">
         <div class="result-details">
           <div class="result-q">${i + 1}. [${escHtml(it.question_type)}] ${escHtml(it.question)}</div>
-          <div class="result-ans">내 답: <strong>${escHtml(it.my_answer || '(없음)')}</strong> / 정답: ${escHtml(it.correct_answer)}</div>
+          ${choicesHtml}
+          <div class="result-ans">내 답: <strong>${myAnswerText}</strong> / 정답: ${correctAnswerText}</div>
           <div class="mt-8">${statusHtml}</div>
           ${it.explanation ? `<div class="result-exp">${escHtml(it.explanation)}</div>` : ""}
         </div>
@@ -2674,22 +2708,23 @@ function renderAdminResults(list) {
     attempts.sort((a,b) => Number(a.attempt_number) - Number(b.attempt_number));
     const first = attempts[0];
     const last = attempts[attempts.length - 1];
-    const summary = attempts.length > 1
-      ? `첫 ${first.score}/${first.total} · 최근 ${last.score}/${last.total} · ${attempts.length}회`
-      : `${last.score}/${last.total}`;
-    const detailBtns = attempts.map(a => `<button class="btn btn-secondary btn-sm" onclick="showResultDetail(${a._row})">${a.attempt_number}회</button>`).join(' ');
+    const scoreHtml = attempts.length > 1
+      ? `<div>첫 ${first.score}/${first.total}</div><div>최근 ${last.score}/${last.total}</div><div>${attempts.length}회 응시</div>`
+      : `<div>${last.score}/${last.total}</div>`;
+    const detailBtns = attempts.map(a =>
+      `<div class="result-attempt-row"><button class="btn btn-secondary btn-sm" onclick="showResultDetail(${a._row})">${a.attempt_number}회</button><span class="result-attempt-time">${formatDate(a.timestamp)}</span></div>`
+    ).join('');
     return `<div class="result-row">
       <span>${escHtml(last.name)}<br><small>${escHtml(last.student_id)}</small></span>
       <span>${last.class}반 ${last.week}주</span>
-      <span>${summary}</span>
-      <span style="font-size:0.72rem">${formatDate(last.timestamp)}</span>
+      <span class="result-scores">${scoreHtml}</span>
       <span class="result-attempts">${detailBtns}</span>
     </div>`;
   });
 
   el.innerHTML = `
     <div class="result-row result-row-header">
-      <span>이름/학번</span><span>분반·주차</span><span>점수</span><span>최근 시간</span><span>상세</span>
+      <span>이름/학번</span><span>분반·주차</span><span>점수</span><span>상세</span>
     </div>` + rows.join('');
 }
 
@@ -2707,10 +2742,12 @@ function showResultDetail(row) {
          <button class="btn btn-danger btn-sm" onclick="gradeItemInModal(${r._row},${i},'wrong',this)">틀림</button>`
       : (it.correct ? '<span class="result-correct">정답</span>' : '<span class="result-wrong">오답</span>');
     const expHtml = it.explanation ? `<div class="result-exp">${escHtml(it.explanation)}</div>` : "";
+    const { choicesHtml, myAnswerText, correctAnswerText } = formatQuizChoicesForReview(it.question_type, it.choices, it.my_answer, it.correct_answer);
     return `<div class="result-item">
       <div class="result-details">
         <div class="result-q">${i+1}. [${escHtml(it.question_type)}] ${escHtml(it.question)}</div>
-        <div class="result-ans">내 답: <strong>${escHtml(it.my_answer||'(없음)')}</strong> / 정답: ${escHtml(it.correct_answer)}</div>
+        ${choicesHtml}
+        <div class="result-ans">내 답: <strong>${myAnswerText}</strong> / 정답: ${correctAnswerText}</div>
         <div class="mt-8">${statusHtml}</div>
         ${expHtml}
       </div>
