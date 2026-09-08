@@ -562,6 +562,28 @@ body::before {
   color: var(--gray-700);
   white-space: pre-wrap;
 }
+.review-choices { list-style: none; display: flex; flex-direction: column; gap: 6px; margin: 8px 0; padding: 0; }
+.review-choice-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  color: var(--gray-700);
+}
+.review-choice-item.is-answer { background: var(--primary-light); font-weight: 600; color: var(--gray-800); }
+.review-choice-num { flex-shrink: 0; font-weight: 700; }
+
+/* ===== 공용 모달 ===== */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; overflow-y: auto; padding: 20px; }
+.modal-box { max-width: 560px; margin: 0 auto; background: var(--surface); border-radius: var(--radius-lg); padding: 20px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+.modal-close-btn {
+  flex-shrink: 0; width: 32px; height: 32px;
+  border: none; border-radius: 50%;
+  background: var(--gray-100); color: var(--gray-600);
+  font-size: 22px; line-height: 1; cursor: pointer;
+}
+.modal-close-btn:hover { background: var(--gray-200); }
 
 /* ===== Admin UI ===== */
 .admin-panel { display: none; }
@@ -603,6 +625,7 @@ body::before {
   font-size: 0.78rem;
   color: var(--gray-700);
 }
+.result-attempts { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 
 /* ===== Deadline Settings ===== */
 .deadline-card {
@@ -1980,6 +2003,23 @@ function renderQuizGrid(statusList, cls) {
   });
 }
 
+// 객관식 보기 문자열("보기1|보기2|...")을 ①②③④ 목록 HTML로, 정답을 사람이 읽기 쉬운
+// 텍스트("③ 보기3" / "O" / 서술형 원문)로 변환. 제출 현황·퀴즈 응시 기록 등 읽기 전용
+// 복습 화면에서 공통으로 쓴다.
+function formatChoicesForReview(questionType, choicesStr, answer) {
+  const nums = ["①","②","③","④"];
+  if (questionType === "객관식" && choicesStr) {
+    const choices = choicesStr.split("|");
+    const idx = Number(answer) - 1;
+    const choicesHtml = `<ul class="review-choices">` + choices.map((ch, i) =>
+      `<li class="review-choice-item${i === idx ? ' is-answer' : ''}"><span class="review-choice-num">${nums[i] || (i + 1)}</span><span>${escHtml(ch)}</span></li>`
+    ).join('') + `</ul>`;
+    const answerText = `${nums[idx] || answer} ${escHtml(choices[idx] || '')}`;
+    return { choicesHtml, answerText };
+  }
+  return { choicesHtml: "", answerText: escHtml(answer) };
+}
+
 // 문제 제출 현황 카드 클릭 → 본인이 그 주차에 제출한 문제 상세를 팝업으로 표시
 async function showSubmissionDetail(week) {
   if (meVerifiedSubject !== (currentSubject && currentSubject.id)) return;
@@ -1989,12 +2029,12 @@ async function showSubmissionDetail(week) {
     const sub = data.submission;
     if (!sub) return showToast("해당 주차에 제출한 문제가 없습니다.", "info");
     const statusInfo = { approved: ["승인", "result-correct"], rejected: ["반려", "result-wrong"] }[sub.status] || ["검토 대기", "result-pending"];
-    const choicesHtml = sub.choices ? `<div class="result-ans">보기: ${escHtml(sub.choices)}</div>` : "";
+    const { choicesHtml, answerText } = formatChoicesForReview(sub.question_type, sub.choices, sub.answer);
     const noteHtml = sub.professor_note ? `<div class="result-exp">교수자 메모: ${escHtml(sub.professor_note)}</div>` : "";
     const html = `<div class="result-item"><div class="result-details">
       <div class="result-q">[${escHtml(sub.question_type)}] ${escHtml(sub.question)}</div>
       ${choicesHtml}
-      <div class="result-ans">정답: ${escHtml(sub.answer)}</div>
+      <div class="result-ans">정답: ${answerText}</div>
       ${sub.explanation ? `<div class="result-exp">해설: ${escHtml(sub.explanation)}</div>` : ""}
       <div class="mt-8"><span class="${statusInfo[1]}">${statusInfo[0]}</span></div>
       ${noteHtml}
@@ -2643,7 +2683,7 @@ function renderAdminResults(list) {
       <span>${last.class}반 ${last.week}주</span>
       <span>${summary}</span>
       <span style="font-size:0.72rem">${formatDate(last.timestamp)}</span>
-      <span class="flex gap-8 flex-wrap">${detailBtns}</span>
+      <span class="result-attempts">${detailBtns}</span>
     </div>`;
   });
 
@@ -2677,17 +2717,7 @@ function showResultDetail(row) {
     </div>`;
   }).join('');
 
-  const modal = document.createElement("div");
-  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;overflow-y:auto;padding:20px";
-  modal.innerHTML = `<div style="max-width:560px;margin:0 auto;background:white;border-radius:12px;padding:20px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <strong>${escHtml(r.name)} (${weekLabel(r.week)} · ${r.attempt_number}회) 상세 답안</strong>
-      <button class="btn btn-secondary btn-sm" onclick="this.closest('[style]').remove()">닫기</button>
-    </div>
-    <div id="resultDetailInner">${html}</div>
-  </div>`;
-  document.body.appendChild(modal);
-
+  const modal = openModal(`${r.name} (${weekLabel(r.week)} · ${r.attempt_number}회) 상세 답안`, `<div id="resultDetailInner">${html}</div>`);
   modal._row = r._row;
   modal._items = items;
 }
@@ -2716,8 +2746,7 @@ async function gradePendingItem(row, idx, result, btn) {
 // 상세 모달에서 채점한 경우 채점 후 모달을 닫고 목록/배지를 갱신한다.
 async function gradeItemInModal(row, idx, result, btn) {
   await gradePendingItem(row, idx, result, btn);
-  const modal = btn.closest("[style*='fixed']");
-  if (modal) modal.remove();
+  closeModal(btn);
 }
 
 function computePendingList() {
@@ -2855,18 +2884,32 @@ async function downloadQuestionBankCSV() {
 }
 
 // ===== 공용 모달 =====
+// 명확한 X 닫기 버튼 + 바깥(오버레이) 클릭 + ESC 키로 닫을 수 있게 한다. 뒤로가기/창
+// 닫기에 의존하면 안드로이드 등에서 인터넷 창 전체가 닫혀버리는 문제가 있었음.
 function openModal(title, bodyHtml) {
-  const modal = document.createElement("div");
-  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;overflow-y:auto;padding:20px";
-  modal.innerHTML = `<div style="max-width:560px;margin:0 auto;background:var(--surface);border-radius:var(--radius-lg);padding:20px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `<div class="modal-box">
+    <div class="modal-header">
       <strong>${escHtml(title)}</strong>
-      <button class="btn btn-secondary btn-sm" onclick="this.closest('[style]').remove()">닫기</button>
+      <button type="button" class="modal-close-btn" aria-label="닫기" onclick="closeModal(this)">&times;</button>
     </div>
     <div>${bodyHtml}</div>
   </div>`;
-  document.body.appendChild(modal);
-  return modal;
+  overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) closeModal(overlay); });
+  const onKeydown = (e) => { if (e.key === "Escape") closeModal(overlay); };
+  overlay._onKeydown = onKeydown;
+  document.addEventListener("keydown", onKeydown);
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+// 닫기 버튼(자식 엘리먼트) 또는 오버레이 자신(바깥 클릭/ESC)에서 호출된다.
+function closeModal(el) {
+  const overlay = el.classList && el.classList.contains("modal-overlay") ? el : el.closest(".modal-overlay");
+  if (!overlay) return;
+  document.removeEventListener("keydown", overlay._onKeydown);
+  overlay.remove();
 }
 
 // ===== 명단 관리 =====
