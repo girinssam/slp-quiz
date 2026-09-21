@@ -1969,6 +1969,10 @@ function applyDeadlines(list) {
 function updateWeekDropdownWithDeadlines() {
   const sel = document.getElementById("sub-week");
   if (!sel) return;
+  // syncDeadlinesFromStatus로 인해 이 함수가 이제 세션 중 여러 번 다시 불릴 수
+  // 있으므로(예: 다른 탭에서의 백그라운드 새로고침), 매번 새로 그리면서 학생이 이미
+  // 골라둔 선택값을 잃지 않게 보존한다.
+  const prevValue = sel.value;
   sel.innerHTML = '<option value="">-- 주차를 선택하세요 --</option>';
   deadlinesCache.forEach(d => {
     const opt = document.createElement("option");
@@ -1985,12 +1989,14 @@ function updateWeekDropdownWithDeadlines() {
     }
     sel.appendChild(opt);
   });
+  if (prevValue && sel.querySelector(`option[value="${prevValue}"]`)) sel.value = prevValue;
 }
 
 function updateQuizWeekDropdown() {
   const cls = currentSubject && me.sec ? me.sec[currentSubject.id] : null;
   const sel = document.getElementById("quiz-week");
   if (!sel) return;
+  const prevValue = sel.value; // 위 updateWeekDropdownWithDeadlines와 같은 이유
   sel.innerHTML = '<option value="">-- 퀴즈가 있는 주차를 선택하세요 --</option>';
   if (!cls) return;
   deadlinesCache.filter(d => cls === 'A' ? d.hasQuizA : d.hasQuizB).forEach(d => {
@@ -2007,6 +2013,36 @@ function updateQuizWeekDropdown() {
     }
     sel.appendChild(opt);
   });
+  if (prevValue && sel.querySelector(`option[value="${prevValue}"]`)) sel.value = prevValue;
+}
+
+// getSubmissionStatus는 요청마다 is_open/quiz_is_open을 새로 계산해 보내주는데
+// (Code.gs computeOpen), deadlinesCache는 본인 확인 시 딱 한 번만 채워지고 세션 내내
+// 다시 안 가져온다(switchTab의 "deadlinesCache.length===0"일 때만 재조회하는 가드
+// 참고) — 그래서 세션이 길어지거나 그 사이 관리자가 마감일을 바꾸면, 이 캐시 기반
+// 드롭다운(퀴즈 풀기/문제 제출 탭)만 낡은 값을 계속 보여주고, 매번 새로 조회하는
+// "이번 주 할 일"/제출 현황 쪽은 정확한 값을 보여주는 불일치가 생긴다. loadStatus가
+// 성공할 때마다 그 최신 값으로 deadlinesCache를 갱신해 두 화면이 항상 같은 마감
+// 데이터를 보게 한다. force_closed/quiz_force_closed는 학생 화면에서 실제로 읽는
+// 곳이 없어(관리자 화면 전용) 이전 값을 그대로 들고 간다.
+function syncDeadlinesFromStatus(statusList, cls) {
+  deadlinesCache = statusList.map(s => {
+    const prev = deadlinesCache.find(d => Number(d.week) === Number(s.week)) || {};
+    return {
+      ...prev,
+      week: s.week,
+      class: cls,
+      deadline_date: s.deadline,
+      is_open: s.is_open,
+      quiz_deadline_date: s.quiz_deadline,
+      quiz_is_open: s.quiz_is_open,
+      week_type: s.week_type,
+      hasQuizA: s.hasQuizA,
+      hasQuizB: s.hasQuizB
+    };
+  });
+  updateWeekDropdownWithDeadlines();
+  updateQuizWeekDropdown();
 }
 
 function formatDate(s) {
@@ -2138,6 +2174,7 @@ async function loadStatus(opts = {}) {
     renderSubmissionGrid(data.status);
     renderQuizGrid(data.status, cls);
     renderTodoCard(data.status, cls);
+    syncDeadlinesFromStatus(data.status, cls);
     saveCachedTodoStatus(currentSubject.id, me.no, data.status);
     document.getElementById("statusResult").classList.remove("hidden");
     statusLoaded = true;
