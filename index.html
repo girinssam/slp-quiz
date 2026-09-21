@@ -1423,7 +1423,7 @@ document.addEventListener("DOMContentLoaded", () => {
   me = loadMe();
   renderIdSectionOptions();
   lockStudentTabs();
-  setIdStatus("neutral", "이름과 분반을 입력하면 수강 명단과 대조합니다.");
+  setIdStatus("neutral", "이름·학번·분반을 입력하면 수강 명단과 대조합니다.");
 
   if (location.hash === "#admin") showAdminView();
   // 학생 탭은 위 lockStudentTabs()로 이미 잠겨 있고 본인 확인 전까지는(pointer-events:
@@ -1461,17 +1461,40 @@ function loadMe() {
 }
 function saveMe() { safeStorageSet(localStorage, ME_KEY, JSON.stringify(me)); }
 
+// "정보 지우기" — 이 기기에 남은 학생 개인정보(이름/학번/분반 + 퀴즈 임시저장에
+// 인코딩된 이름/학번/분반/주차+답안)를 전부 지우고 화면도 초기 상태로 되돌린다.
+// slpQuizProgress:: 접두사 키는 주차마다 하나씩 쌓이므로 미리 정해진 목록이 아니라
+// localStorage를 순회해서 접두사로 찾아 지운다.
+function clearAllQuizProgress() {
+  const keysToRemove = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.indexOf("slpQuizProgress::") === 0) keysToRemove.push(key);
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  } catch (e) { /* 저장소 접근 불가 시 무시 */ }
+}
+
 function clearMe() {
   me = { name: "", no: "", sec: {} };
   meVerifiedSubject = null;
   safeStorageRemove(localStorage, ME_KEY);
+  clearAllQuizProgress();
+  resetQuiz();
   const nameEl = document.getElementById("id-name");
   const noEl = document.getElementById("id-no");
   if (nameEl) nameEl.value = "";
   if (noEl) noEl.value = "";
   document.querySelectorAll('#idSectionGroup input[type="radio"]').forEach(r => r.checked = false);
   lockStudentTabs();
-  setIdStatus("neutral", "이름과 분반을 입력하면 수강 명단과 대조합니다.");
+  // switchTab()은 onclick의 전역 event.currentTarget에 의존하므로 여기서 직접
+  // 호출하지 않고 "문제 제출" 탭으로 동일하게 되돌리는 동작만 인라인으로 수행한다.
+  document.querySelectorAll("#studentView .tab-panel").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll("#studentView .tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("tab-submit")?.classList.add("active");
+  document.querySelector("#studentTabs .tab-btn")?.classList.add("active");
+  setIdStatus("neutral", "이름·학번·분반을 입력하면 수강 명단과 대조합니다.");
 }
 
 function renderIdSectionOptions() {
@@ -1546,10 +1569,10 @@ async function verifyIdentity() {
   const no = (noEl?.value || "").trim();
   const sec = secEl?.value || "";
 
-  if (!name || !sec) {
+  if (!name || !no || !sec) {
     meVerifiedSubject = null;
     lockStudentTabs();
-    setIdStatus("neutral", "이름과 분반을 입력하면 수강 명단과 대조합니다.");
+    setIdStatus("neutral", "이름·학번·분반을 입력하면 수강 명단과 대조합니다.");
     return;
   }
 
@@ -1576,7 +1599,7 @@ async function reverifyMe() {
   if (!me.name || !sec) {
     meVerifiedSubject = null;
     lockStudentTabs();
-    setIdStatus("neutral", "이름과 분반을 입력하면 수강 명단과 대조합니다.");
+    setIdStatus("neutral", "이름·학번·분반을 입력하면 수강 명단과 대조합니다.");
     return;
   }
 
@@ -2488,10 +2511,13 @@ function populateAdminWeekDropdowns() {
   });
 }
 
+let adminSubmissionsCache = [];
 async function loadAdminSubmissions() {
   const week = document.getElementById("adminReviewWeek").value;
+  const cls = document.querySelector('input[name="review-class"]:checked')?.value || "";
   try {
-    const data = await api({ action:"adminGetSubmissions", token:adminToken, week });
+    const data = await api({ action:"adminGetSubmissions", token:adminToken, week, class: cls });
+    adminSubmissionsCache = data.submissions;
     renderAdminSubmissions(data.submissions);
   } catch(e) { showToast(e.message, "error"); }
 }
@@ -2500,65 +2526,126 @@ function renderAdminSubmissions(list) {
   const el = document.getElementById("adminSubmissionsList");
   if (!list.length) { el.innerHTML = '<p style="color:var(--gray-500);text-align:center;padding:20px">제출된 문제가 없습니다.</p>'; return; }
 
+  const MCQ_NUMS = ["①","②","③","④"];
+
   el.innerHTML = list.map(s => {
+    const row = s._row;
+    const eff = submissionEffective(s);
+    const edited = submissionIsEdited(s);
     const statusBadge = s.status === "approved"
       ? '<span class="badge badge-success">승인</span>'
       : s.status === "rejected"
       ? '<span class="badge badge-danger">반려</span>'
       : '<span class="badge badge-warning">⏳ 대기</span>';
+    const editedBadge = edited ? ' <span class="badge badge-warning">수정됨</span>' : '';
 
-    const choicesHtml = s.question_type === "객관식" ? `
-      <div class="form-group"><label class="form-label">보기 (|로 구분)</label>
-      <input type="text" class="form-input" id="s-choices-${s._row}" value="${escAttr(s.choices||'')}"></div>` : '';
+    let answerFieldsHtml;
+    if (s.question_type === "객관식") {
+      const choices = String(eff.choices || '').split('|');
+      const ansVal = String(eff.answer || '');
+      answerFieldsHtml = `
+        <div class="form-group"><label class="form-label">보기 4개</label>
+          <div class="choices-editor">
+            ${[0,1,2,3].map(i => `<input type="text" class="form-input" id="s-ch${i+1}-${row}" value="${escAttr(choices[i]||'')}" placeholder="${MCQ_NUMS[i]} 보기 ${i+1}">`).join('')}
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">정답</label>
+          <div class="radio-group">
+            ${[1,2,3,4].map(i => `<label class="radio-label"><input type="radio" name="s-mcq-ans-${row}" value="${i}"${ansVal===String(i)?' checked':''}><span class="dot"></span>${MCQ_NUMS[i-1]}</label>`).join('')}
+          </div>
+        </div>`;
+    } else if (s.question_type === "OX") {
+      const ansVal = String(eff.answer || '');
+      answerFieldsHtml = `
+        <div class="form-group"><label class="form-label">정답</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" name="s-ox-ans-${row}" value="O"${ansVal==='O'?' checked':''}><span class="dot"></span>O</label>
+            <label class="radio-label"><input type="radio" name="s-ox-ans-${row}" value="X"${ansVal==='X'?' checked':''}><span class="dot"></span>X</label>
+          </div>
+        </div>`;
+    } else {
+      answerFieldsHtml = `
+        <div class="form-group"><label class="form-label">정답</label>
+          <input type="text" class="form-input" id="s-ans-${row}" value="${escAttr(eff.answer||'')}">
+          ${s.question_type === "단답형" ? '<div style="font-size:0.9375rem;color:var(--gray-500);margin-top:4px">단답형은 <code>/</code>로 복수 정답 입력 가능 (예: 파열음/폐쇄음)</div>' : ''}
+        </div>`;
+    }
+
+    const originalToggleHtml = edited ? `<button type="button" class="btn btn-secondary btn-sm" onclick="toggleOriginalSubmission(${row})">원본 보기</button>` : '';
+    const originalBoxHtml = edited ? (() => {
+      const orig = formatChoicesForReview(s.question_type, s.choices, s.answer);
+      return `<div class="hidden" id="s-orig-${row}" style="background:var(--gray-50);border-radius:8px;padding:10px;margin:8px 0;font-size:0.9rem">
+        <div style="font-weight:600;color:var(--gray-600);margin-bottom:6px">원본 (학생 제출)</div>
+        <div>${escHtml(s.question||'')}</div>
+        ${orig.choicesHtml}
+        <div class="result-ans" style="margin-top:6px">정답: ${orig.answerText}</div>
+        ${s.explanation ? `<div class="result-exp">해설: ${escHtml(s.explanation)}</div>` : ''}
+      </div>`;
+    })() : '';
 
     return `<div class="submission-item">
       <div class="submission-header">
-        <span class="submission-meta">${weekLabel(s.week)} · ${s.name} (${s.student_id}) · ${s.class}반 · <strong>${s.question_type}</strong></span>
+        <span class="submission-meta">${weekLabel(s.week)} · ${s.name} (${s.student_id}) · ${s.class}반 · <strong>${s.question_type}</strong>${editedBadge}</span>
         ${statusBadge}
       </div>
+      ${originalToggleHtml}
+      ${originalBoxHtml}
       <div class="form-group">
         <label class="form-label">문제</label>
-        <textarea class="form-textarea" id="s-q-${s._row}" style="min-height:60px">${escHtml(s.question||'')}</textarea>
+        <textarea class="form-textarea" id="s-q-${row}" style="min-height:60px">${escHtml(eff.question||'')}</textarea>
       </div>
-      ${choicesHtml}
-      <div class="form-group">
-        <label class="form-label">정답</label>
-        <input type="text" class="form-input" id="s-ans-${s._row}" value="${escAttr(s.answer||'')}">
-        ${s.question_type === "단답형" ? '<div style="font-size:0.9375rem;color:var(--gray-500);margin-top:4px">단답형은 <code>/</code>로 복수 정답 입력 가능 (예: 파열음/폐쇄음)</div>' : ''}
-      </div>
+      ${answerFieldsHtml}
       <div class="form-group">
         <label class="form-label">해설 (선택)</label>
-        <textarea class="form-textarea" id="s-exp-${s._row}" style="min-height:50px">${escHtml(s.explanation||'')}</textarea>
+        <textarea class="form-textarea" id="s-exp-${row}" style="min-height:50px">${escHtml(eff.explanation||'')}</textarea>
       </div>
       <div class="submission-actions">
-        <button class="btn btn-success btn-sm" onclick="updateSubmission(${s._row},'approved')">승인</button>
-        <button class="btn btn-danger btn-sm" onclick="updateSubmission(${s._row},'rejected')">반려</button>
-        <button class="btn btn-secondary btn-sm" onclick="saveSubmissionEdit(${s._row})">저장</button>
+        <button class="btn btn-success btn-sm" onclick="updateSubmission(${row},'approved')">승인</button>
+        <button class="btn btn-danger btn-sm" onclick="updateSubmission(${row},'rejected')">반려</button>
       </div>
     </div>`;
   }).join('');
 }
 
+// 원본 위에 교수자 edited_*가 있으면 그걸 우선 보여주는 "효과값". 목록 렌더/수정 폼
+// 프리필에 공통으로 쓴다 — adminGetQuizPreview/adminPublishQuiz의 effectiveSubmission과
+// 같은 규칙(edited_*가 비어있지 않으면 그것을 우선)을 프런트에도 그대로 맞춘다.
+function submissionEffective(s) {
+  const pick = (orig, edited) => (edited !== undefined && edited !== null && String(edited).trim() !== "") ? edited : orig;
+  return {
+    question: pick(s.question, s.edited_question),
+    choices: pick(s.choices, s.edited_choices),
+    answer: pick(s.answer, s.edited_answer),
+    explanation: pick(s.explanation, s.edited_explanation)
+  };
+}
+function submissionIsEdited(s) {
+  return ["edited_question","edited_choices","edited_answer","edited_explanation"].some(k => String(s[k]||"").trim() !== "");
+}
+
+function toggleOriginalSubmission(row) {
+  const el = document.getElementById(`s-orig-${row}`);
+  if (el) el.classList.toggle("hidden");
+}
+
 async function updateSubmission(row, status) {
+  const s = adminSubmissionsCache.find(x => x._row === row);
+  if (!s) return;
   const question = document.getElementById(`s-q-${row}`)?.value;
-  const choices = document.getElementById(`s-choices-${row}`)?.value;
-  const answer = document.getElementById(`s-ans-${row}`)?.value;
   const explanation = document.getElementById(`s-exp-${row}`)?.value;
+  let choices, answer;
+  if (s.question_type === "객관식") {
+    choices = [1,2,3,4].map(i => document.getElementById(`s-ch${i}-${row}`)?.value || '').join('|');
+    answer = document.querySelector(`input[name="s-mcq-ans-${row}"]:checked`)?.value;
+  } else if (s.question_type === "OX") {
+    answer = document.querySelector(`input[name="s-ox-ans-${row}"]:checked`)?.value;
+  } else {
+    answer = document.getElementById(`s-ans-${row}`)?.value;
+  }
   try {
     await api({ action:"adminUpdateSubmission", token:adminToken, row, status, question, choices, answer, explanation });
     showToast(status === "approved" ? "승인되었습니다." : "반려되었습니다.", "success");
     loadAdminSubmissions();
-  } catch(e) { showToast(e.message, "error"); }
-}
-
-async function saveSubmissionEdit(row) {
-  const question = document.getElementById(`s-q-${row}`)?.value;
-  const choices = document.getElementById(`s-choices-${row}`)?.value;
-  const answer = document.getElementById(`s-ans-${row}`)?.value;
-  const explanation = document.getElementById(`s-exp-${row}`)?.value;
-  try {
-    await api({ action:"adminUpdateSubmission", token:adminToken, row, question, choices, answer, explanation });
-    showToast("저장되었습니다.", "success");
   } catch(e) { showToast(e.message, "error"); }
 }
 
@@ -2618,11 +2705,15 @@ async function loadQuizPreview() {
       document.getElementById("publishBtnWrap").classList.add("hidden");
       return;
     }
-    el.innerHTML = data.questions.map((q,i) => `
+    el.innerHTML = data.questions.map((q,i) => {
+      const { choicesHtml, answerText } = formatChoicesForReview(q.question_type, q.choices, q.answer);
+      return `
       <div style="padding:10px;background:var(--gray-50);border-radius:8px;margin-bottom:8px;font-size:0.9rem;">
         <strong>${i+1}. [${q.question_type}]</strong> ${escHtml(q.question)}
-        <div style="margin-top:4px;color:var(--gray-600)">정답: ${escHtml(q.answer)} · 제출자: ${escHtml(q.name)}</div>
-      </div>`).join('');
+        ${choicesHtml}
+        <div style="margin-top:4px;color:var(--gray-600)">정답: ${answerText} · 제출자: ${escHtml(q.name)}</div>
+      </div>`;
+    }).join('');
     document.getElementById("publishBtn").textContent = `${weekLabel(week)} ${cls}반 퀴즈 게시`;
     document.getElementById("publishBtnWrap").classList.remove("hidden");
   } catch(e) { showToast(e.message, "error"); }
@@ -3143,12 +3234,13 @@ function showStudentSubmissions() {
   const html = submitted.map(w => {
     const s = w.submission;
     const badgeCls = s.status === "approved" ? "badge-success" : s.status === "rejected" ? "badge-danger" : "badge-gray";
+    const { choicesHtml, answerText } = formatChoicesForReview(s.question_type, s.choices, s.answer);
     return `<div class="result-item">
       <div class="result-details">
         <div class="result-q">${weekLabel(w.week)} · [${escHtml(s.question_type || "")}] <span class="badge ${badgeCls}">${escHtml(s.status || "")}</span></div>
         <div class="result-q">${escHtml(s.question)}</div>
-        ${s.choices ? `<div class="result-ans">보기: ${escHtml(s.choices)}</div>` : ""}
-        <div class="result-ans">정답: ${escHtml(s.answer || "")}</div>
+        ${choicesHtml}
+        <div class="result-ans">정답: ${answerText}</div>
       </div>
     </div>`;
   }).join("");
