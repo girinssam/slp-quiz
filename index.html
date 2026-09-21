@@ -265,9 +265,10 @@ body::before {
 .card-title .icon { font-size: 1.1rem; }
 
 .todo-card { border: 1.5px solid var(--primary-soft); background: var(--primary-light); }
-.todo-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; font-size: 0.95rem; }
+.todo-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; font-size: 18px; flex-wrap: wrap; }
+.todo-row .todo-label { white-space: nowrap; }
 .todo-row + .todo-row { border-top: 1px solid rgba(0,0,0,0.06); }
-.todo-status { font-size: 0.88rem; color: var(--gray-600); white-space: nowrap; }
+.todo-status { font-size: 1rem; color: var(--gray-600); white-space: nowrap; }
 .todo-status.todo-done { color: var(--ok); font-weight: 700; }
 .todo-status.todo-due { color: var(--wait); font-weight: 700; }
 
@@ -2164,7 +2165,7 @@ function renderTodoCard(statusList, cls) {
   let quizRowHtml = "";
   const actionBtns = [];
   if (!submitDone && !submitClosed) {
-    actionBtns.push(`<button class="btn btn-primary btn-sm" onclick="goToTodoAction(${target.week},'submit')">문제 제출하러 가기</button>`);
+    actionBtns.push(`<button class="btn btn-primary" onclick="goToTodoAction(${target.week},'submit')">문제 제출하러 가기</button>`);
   }
   if (hasQuiz) {
     const quizDone = target.quizDone;
@@ -2174,14 +2175,14 @@ function renderTodoCard(statusList, cls) {
       : quizClosed
       ? `<span class="todo-status">퀴즈 응시 마감</span>`
       : `<span class="todo-status todo-due">퀴즈 미응시 · 마감 ${formatDate(target.quiz_deadline)}</span>`;
-    quizRowHtml = `<div class="todo-row"><span>${weekLabel(target.week)} 퀴즈</span>${quizStatusHtml}</div>`;
+    quizRowHtml = `<div class="todo-row"><span class="todo-label">${weekLabel(target.week)} 퀴즈</span>${quizStatusHtml}</div>`;
     if (!quizDone && !quizClosed) {
-      actionBtns.push(`<button class="btn btn-primary btn-sm" onclick="goToTodoAction(${target.week},'quiz')">퀴즈 풀러 가기</button>`);
+      actionBtns.push(`<button class="btn btn-primary" onclick="goToTodoAction(${target.week},'quiz')">퀴즈 풀러 가기</button>`);
     }
   }
 
   body.innerHTML = `
-    <div class="todo-row"><span>${weekLabel(target.week)} 문제 제출</span>${submitStatusHtml}</div>
+    <div class="todo-row"><span class="todo-label">${weekLabel(target.week)} 문제 제출</span>${submitStatusHtml}</div>
     ${quizRowHtml}
     ${actionBtns.length ? `<div class="flex gap-8 flex-wrap mt-12">${actionBtns.join('')}</div>` : ''}
   `;
