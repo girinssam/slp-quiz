@@ -1551,7 +1551,7 @@ function setIdStatus(kind, text) {
 const ID_VERIFY_MESSAGES = {
   not_in_roster: { kind: "bad", text: () => "수강 명단에서 이름을 찾을 수 없습니다." },
   wrong_section: { kind: "bad", text: (name, result) => `${name} 학생은 ${result.sec}반 소속입니다. 분반을 확인해 주세요.` },
-  need_id:       { kind: "neutral", text: () => "동명이인이 있습니다. 학번을 정확히 입력해주세요." },
+  need_id:       { kind: "neutral", text: () => "학번을 입력해주세요." },
   id_mismatch:   { kind: "bad", text: () => "이름과 학번이 서로 다릅니다. 다시 확인해주세요." }
 };
 
@@ -1602,7 +1602,7 @@ async function verifyIdentity() {
   const btn = document.getElementById("idVerifyBtn");
   if (btn) btn.disabled = true;
   try {
-    const data = await api({ action: "verifyStudent", name, student_id: no, class: sec });
+    const data = await api({ action: "verifyStudent", name, student_id: no, class: sec }, { timeoutMs: API_READ_TIMEOUT_MS });
     applyVerifyResult(name, data.result, data.deadlines);
   } catch (e) {
     setIdStatus("bad", e.message);
@@ -1632,7 +1632,7 @@ async function reverifyMe() {
   if (noEl) noEl.value = me.no;
 
   try {
-    const data = await api({ action: "verifyStudent", name: me.name, student_id: me.no, class: sec });
+    const data = await api({ action: "verifyStudent", name: me.name, student_id: me.no, class: sec }, { timeoutMs: API_READ_TIMEOUT_MS });
     if (data.result.ok) {
       applyVerifyResult(me.name, data.result, data.deadlines);
     } else {
@@ -1695,13 +1695,20 @@ function populateWeekDropdowns() {
 //  2) 서버의 "잠금 시간초과"(접속 몰림) 오류: 최대 3회, 지수 백오프(1초→2초→4초)로
 //     재시도해 몰린 요청이 자연스럽게 분산되게 한다.
 // 그 외 서버가 명확히 응답한 오류(data.success===false)는 재시도하지 않고 즉시 반환.
-// 타임아웃(API_TIMEOUT_MS)은 서버 잠금 대기(Code.gs, 30초)보다 넉넉히 길게 잡아,
-// 잠금 대기 중인 요청이 실제 응답을 받기 전에 클라이언트가 먼저 끊어버리지 않게 한다.
 // 그와 별개로, 재시도를 몇 번 거치든 전체 호출은 API_TOTAL_TIMEOUT_MS(60초)를
 // 넘기지 않는다 — 개별 시도 타임아웃과 재시도 대기가 겹쳐서 체감상 "무한 로딩"처럼
 // 느껴지는 걸 막기 위한 상한선이다.
 // =============================================
+// API_TIMEOUT_MS(기본값, 쓰기 액션용): 서버 잠금 대기(Code.gs, 30초)보다 넉넉히
+// 길게 잡아, 잠금 대기 중인 요청이 실제 응답을 받기 전에 클라이언트가 먼저 끊어버리지
+// 않게 한다. 쓰기 액션은 대부분 재시도해도 안전(같은 키를 덮어쓰는 방식)하지만,
+// 그래도 30초 잠금 대기보다 짧게 끊으면 서버가 아직 정상 대기 중인 요청을 클라이언트가
+// 먼저 포기하고 또 보내 잠금 대기열만 늘리는 재시도 폭주로 이어질 수 있어 손대지 않는다.
+// API_READ_TIMEOUT_MS(읽기 액션용): 읽기는 잠금을 쓰지 않아 저 제약이 없고, 화면을
+// 오래 막지 않는 게 더 중요하므로 훨씬 짧게 끊고 재시도한다 — opts.timeoutMs로 개별
+// 호출부에서 지정한다(기본은 API_TIMEOUT_MS).
 const API_TIMEOUT_MS = 35000;
+const API_READ_TIMEOUT_MS = 13000;
 const API_TOTAL_TIMEOUT_MS = 60000;
 const API_MAX_ATTEMPTS = 3;
 const API_RETRY_DELAY_MS = 1000;
@@ -1729,6 +1736,10 @@ async function api(params, opts = {}) {
   // 호출(예: 본인 확인 직후 "이번 주 할 일" 카드 조회)에 쓴다. 그 호출 자체의 로딩
   // 표시는 호출부가 각자(카드 안에 "불러오는 중" 등) 알아서 보여준다.
   const silent = !!opts.silent;
+  // timeoutMs: 개별 시도(재시도 포함 각 회차)의 최대 대기 시간. 지정 없으면 쓰기
+  // 액션 기준의 긴 기본값(API_TIMEOUT_MS)을 쓴다 — 읽기 액션 호출부만 짧은
+  // API_READ_TIMEOUT_MS를 명시적으로 넘긴다(위 상수 선언부 설명 참고).
+  const timeoutBudget = opts.timeoutMs || API_TIMEOUT_MS;
   // 과목이 지정되지 않은 요청에는 현재 선택된 과목을 자동으로 붙인다.
   const body = (params.subject || !currentSubject) ? params : { ...params, subject: currentSubject.id };
 
@@ -1750,7 +1761,7 @@ async function api(params, opts = {}) {
     }
 
     const controller = new AbortController();
-    const attemptTimeout = Math.min(API_TIMEOUT_MS, remaining);
+    const attemptTimeout = Math.min(timeoutBudget, remaining);
     const timer = setTimeout(() => controller.abort(), attemptTimeout);
     const inFlightEntry = { controller, deadlineAt: overallDeadline };
     inFlightRequests.add(inFlightEntry);
@@ -1838,7 +1849,7 @@ document.addEventListener("visibilitychange", () => {
 async function loadDeadlines(opts = {}) {
   const cls = currentSubject && me.sec ? me.sec[currentSubject.id] : null;
   try {
-    const data = await api(cls ? { action: "getDeadlines", class: cls } : { action: "getDeadlines" }, { silent: opts.silent });
+    const data = await api(cls ? { action: "getDeadlines", class: cls } : { action: "getDeadlines" }, { silent: opts.silent, timeoutMs: API_READ_TIMEOUT_MS });
     applyDeadlines(data.deadlines);
   } catch (e) {
     if (!opts.silent) showToast(e.message, "error");
@@ -2016,7 +2027,7 @@ async function loadStatus(opts = {}) {
   const cls = me.sec[currentSubject.id];
 
   try {
-    const data = await api({ action:"getSubmissionStatus", name: me.name, student_id: me.no, class: cls }, { silent: opts.silent });
+    const data = await api({ action:"getSubmissionStatus", name: me.name, student_id: me.no, class: cls }, { silent: opts.silent, timeoutMs: API_READ_TIMEOUT_MS });
     renderSubmissionGrid(data.status);
     renderQuizGrid(data.status, cls);
     renderTodoCard(data.status, cls);
@@ -2230,7 +2241,7 @@ async function showSubmissionDetail(week) {
   if (meVerifiedSubject !== (currentSubject && currentSubject.id)) return;
   const cls = me.sec[currentSubject.id];
   try {
-    const data = await api({ action: "getMySubmissionDetail", name: me.name, student_id: me.no, class: cls, week });
+    const data = await api({ action: "getMySubmissionDetail", name: me.name, student_id: me.no, class: cls, week }, { timeoutMs: API_READ_TIMEOUT_MS });
     const sub = data.submission;
     if (!sub) return showToast("해당 주차에 제출한 문제가 없습니다.", "info");
     const statusInfo = { approved: ["승인", "result-correct"], rejected: ["반려", "result-wrong"] }[sub.status] || ["검토 대기", "result-pending"];
@@ -2255,7 +2266,7 @@ async function showQuizAttempts(week) {
   if (meVerifiedSubject !== (currentSubject && currentSubject.id)) return;
   const cls = me.sec[currentSubject.id];
   try {
-    const data = await api({ action: "getMyQuizAttempts", name: me.name, student_id: me.no, class: cls, week });
+    const data = await api({ action: "getMyQuizAttempts", name: me.name, student_id: me.no, class: cls, week }, { timeoutMs: API_READ_TIMEOUT_MS });
     const attempts = data.attempts || [];
     if (!attempts.length) return showToast("해당 주차에 응시한 퀴즈가 없습니다.", "info");
     myQuizAttemptsCache = attempts;
@@ -2334,7 +2345,7 @@ async function startQuiz() {
   const btn = document.getElementById("startQuizBtn");
   if (btn) btn.disabled = true;
   try {
-    const data = await api({ action:"getQuiz", week, class: cls, name, student_id: sid });
+    const data = await api({ action:"getQuiz", week, class: cls, name, student_id: sid }, { timeoutMs: API_READ_TIMEOUT_MS });
     quizData = data.quizzes;
     quizUser = { name, sid, cls, week };
 
@@ -2574,7 +2585,7 @@ async function handleGradeQuizFailure(nextBtn, prevBtn) {
       student_id: quizUser.sid,
       class: quizUser.cls,
       week: quizUser.week
-    });
+    }, { timeoutMs: API_READ_TIMEOUT_MS });
     const attempts = recheck.attempts || [];
     if (attempts.length > 0) {
       const last = attempts[attempts.length - 1];
@@ -2730,7 +2741,7 @@ async function loadAdminSubmissions() {
   const week = document.getElementById("adminReviewWeek").value;
   const cls = document.querySelector('input[name="review-class"]:checked')?.value || "";
   try {
-    const data = await api({ action:"adminGetSubmissions", token:adminToken, week, class: cls });
+    const data = await api({ action:"adminGetSubmissions", token:adminToken, week, class: cls }, { timeoutMs: API_READ_TIMEOUT_MS });
     adminSubmissionsCache = data.submissions;
     renderAdminSubmissions(data.submissions);
   } catch(e) { showToast(e.message, "error"); }
@@ -2912,7 +2923,7 @@ async function loadQuizPreview() {
   if (!week) return showToast("주차를 선택해주세요.", "error");
   if (!cls)  return showToast("분반을 선택해주세요.", "error");
   try {
-    const data = await api({ action:"adminGetQuizPreview", token:adminToken, week, class: cls });
+    const data = await api({ action:"adminGetQuizPreview", token:adminToken, week, class: cls }, { timeoutMs: API_READ_TIMEOUT_MS });
     const el = document.getElementById("quizPreviewList");
     if (!data.questions.length) {
       el.innerHTML = `<p style="color:var(--gray-500)">${cls}반에 승인된 문제가 없습니다.</p>`;
@@ -2951,14 +2962,14 @@ async function loadAdminResults() {
   const week = document.getElementById("resultWeek").value;
   const cls  = document.querySelector('input[name="result-class"]:checked')?.value || "";
   try {
-    const data = await api({ action:"adminGetResults", token:adminToken, week, class: cls });
+    const data = await api({ action:"adminGetResults", token:adminToken, week, class: cls }, { timeoutMs: API_READ_TIMEOUT_MS });
     adminResultsCache = data.results;
     renderAdminResults(data.results);
     renderPendingBadgeAndList();
 
     const statsEl = document.getElementById("resultStats");
     if (week && cls) {
-      const stats = await api({ action:"adminGetResultStats", token:adminToken, week, class: cls });
+      const stats = await api({ action:"adminGetResultStats", token:adminToken, week, class: cls }, { timeoutMs: API_READ_TIMEOUT_MS });
       renderResultStats(stats);
     } else {
       statsEl.innerHTML = week && !cls
@@ -3189,7 +3200,7 @@ async function loadNonSubmitters(type) {
   if (!cls)  return showToast("분반을 선택해주세요.", "error");
 
   try {
-    const data = await api({ action:"adminGetNonSubmitters", token:adminToken, week, class:cls, type });
+    const data = await api({ action:"adminGetNonSubmitters", token:adminToken, week, class:cls, type }, { timeoutMs: API_READ_TIMEOUT_MS });
     nonSubmittersCache[type] = { week, cls, list: data.nonSubmitters || [] };
     renderNonSubmitters(type);
   } catch(e) { showToast(e.message, "error"); }
@@ -3229,7 +3240,7 @@ function copyNonSubmitters(type) {
 // ===== 문제은행 CSV 내보내기 =====
 async function downloadQuestionBankCSV() {
   try {
-    const data = await api({ action:"adminGetSubmissions", token:adminToken, week:"" });
+    const data = await api({ action:"adminGetSubmissions", token:adminToken, week:"" }, { timeoutMs: API_READ_TIMEOUT_MS });
     const approved = (data.submissions || []).filter(s => s.status === "approved");
     if (!approved.length) return showToast("승인된 문제가 없습니다.", "info");
 
@@ -3274,7 +3285,7 @@ function closeModal(el) {
 // ===== 명단 관리 =====
 async function loadRosterBlockConfig() {
   try {
-    const data = await api({ action:"adminGetRosterConfig", token:adminToken });
+    const data = await api({ action:"adminGetRosterConfig", token:adminToken }, { timeoutMs: API_READ_TIMEOUT_MS });
     const toggle = document.getElementById("rosterBlockToggle");
     if (toggle) toggle.checked = !!data.blockEnabled;
   } catch(e) { showToast(e.message, "error"); }
@@ -3323,7 +3334,7 @@ async function applyRoster() {
 let rosterListCache = [];
 async function loadRosterList() {
   try {
-    const data = await api({ action:"adminGetRoster", token:adminToken });
+    const data = await api({ action:"adminGetRoster", token:adminToken }, { timeoutMs: API_READ_TIMEOUT_MS });
     rosterListCache = data.roster || [];
     renderRosterList();
   } catch(e) { showToast(e.message, "error"); }
@@ -3371,7 +3382,7 @@ async function loadStudentList() {
   const cls = document.querySelector('input[name="students-class"]:checked')?.value || "";
   const query = document.getElementById("studentsSearch")?.value.trim() || "";
   try {
-    const data = await api({ action:"adminListStudents", token:adminToken, class:cls, query });
+    const data = await api({ action:"adminListStudents", token:adminToken, class:cls, query }, { timeoutMs: API_READ_TIMEOUT_MS });
     studentListCache = data.students || [];
     renderStudentList();
   } catch(e) { showToast(e.message, "error"); }
@@ -3401,7 +3412,7 @@ async function showStudentDetail(no) {
   const el = document.getElementById("studentDetailEl");
   if (el) el.innerHTML = `<p style="color:var(--gray-500);font-size:0.85rem">불러오는 중...</p>`;
   try {
-    const data = await api({ action:"adminGetStudentDetail", token:adminToken, no });
+    const data = await api({ action:"adminGetStudentDetail", token:adminToken, no }, { timeoutMs: API_READ_TIMEOUT_MS });
     studentDetailCache = data;
     renderStudentDetail(data);
   } catch(e) { showToast(e.message, "error"); }
@@ -3528,7 +3539,7 @@ function setDeadlineClass(cls) {
 
 async function loadDeadlineSettings() {
   try {
-    const data = await api({ action:"getDeadlines", class: deadlineSettingsClass });
+    const data = await api({ action:"getDeadlines", class: deadlineSettingsClass }, { timeoutMs: API_READ_TIMEOUT_MS });
     deadlinesCache = data.deadlines || [];
     renderDeadlineSettings();
   } catch(e) { showToast(e.message, "error"); }
