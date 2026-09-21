@@ -1711,7 +1711,18 @@ const API_TIMEOUT_MS = 35000;
 const API_READ_TIMEOUT_MS = 13000;
 const API_TOTAL_TIMEOUT_MS = 60000;
 const API_MAX_ATTEMPTS = 3;
+// 쓰기 액션(gradeQuiz 제외 전부)의 네트워크/타임아웃 재시도는 고정 1초 대기를 유지한다
+// — client_token 같은 재시도 안전장치가 없는 액션이 대부분이라, 백오프 도입 여부와
+// 무관하게 "재시도해도 되는가"의 답은 액션별 upsert 로직에 이미 달려있고, 굳이
+// 대기시간 정책까지 읽기와 다르게 가져갈 필요는 없어 보수적으로 그대로 둔다.
 const API_RETRY_DELAY_MS = 1000;
+// 읽기 액션(opts.timeoutMs를 명시하는 호출부)의 네트워크/타임아웃 재시도만 지수
+// 백오프(1s→2s→4s)로 분산시킨다 — LOCK_RETRY_DELAYS_MS와 같은 값. API_MAX_ATTEMPTS=3이라
+// 실제로는 앞의 두 값(1s, 2s)까지만 쓰이고 4s는 시도 횟수를 늘릴 때를 대비한 여유분이다.
+const API_READ_RETRY_DELAYS_MS = [1000, 2000, 4000];
+// 지터: 같은 순간 여러 클라이언트가 동시에 재시도를 보내 서버가 또 몰리는 상황을
+// 피하기 위해 각 대기시간에 0~300ms 무작위 값을 더한다.
+const API_RETRY_JITTER_MS = 300;
 const LOCK_RETRY_DELAYS_MS = [1000, 2000, 4000];
 const LOCK_TIMEOUT_PATTERN = /잠금 시간초과/;
 const LOCK_BUSY_MESSAGE = "지금 접속이 몰리고 있습니다. 잠시 후 다시 시도해주세요.";
@@ -1740,6 +1751,10 @@ async function api(params, opts = {}) {
   // 액션 기준의 긴 기본값(API_TIMEOUT_MS)을 쓴다 — 읽기 액션 호출부만 짧은
   // API_READ_TIMEOUT_MS를 명시적으로 넘긴다(위 상수 선언부 설명 참고).
   const timeoutBudget = opts.timeoutMs || API_TIMEOUT_MS;
+  // opts.timeoutMs를 명시한 호출부 = 읽기 액션(모든 읽기 호출부가 API_READ_TIMEOUT_MS를
+  // 넘김). 네트워크/타임아웃 재시도 대기시간을 읽기만 지수 백오프+지터로 분산시키고,
+  // 쓰기는 기존 고정 1초를 유지하는 데 이 값을 재사용한다.
+  const isReadCall = opts.timeoutMs !== undefined;
   // 과목이 지정되지 않은 요청에는 현재 선택된 과목을 자동으로 붙인다.
   const body = (params.subject || !currentSubject) ? params : { ...params, subject: currentSubject.id };
 
@@ -1794,9 +1809,18 @@ async function api(params, opts = {}) {
       const isNetworkIssue = e.name === "AbortError" || e instanceof TypeError || e.isNetworkError;
       if (!isNetworkIssue) throw e; // 서버가 명확히 응답한 오류는 그대로 전달
 
-      if (retryNetworkErrors && networkAttempt < API_MAX_ATTEMPTS && Date.now() + API_RETRY_DELAY_MS < overallDeadline) {
-        await sleep(API_RETRY_DELAY_MS);
-        continue;
+      if (retryNetworkErrors && networkAttempt < API_MAX_ATTEMPTS) {
+        // 읽기는 지수 백오프(1s→2s→4s)+지터, 쓰기는 기존 고정 1초 — 위 API_READ_RETRY_DELAYS_MS/
+        // isReadCall 선언부 설명 참고.
+        const baseDelay = isReadCall
+          ? (API_READ_RETRY_DELAYS_MS[networkAttempt - 1] ?? API_READ_RETRY_DELAYS_MS[API_READ_RETRY_DELAYS_MS.length - 1])
+          : API_RETRY_DELAY_MS;
+        const jitter = isReadCall ? Math.floor(Math.random() * API_RETRY_JITTER_MS) : 0;
+        const delay = baseDelay + jitter;
+        if (Date.now() + delay < overallDeadline) {
+          await sleep(delay);
+          continue;
+        }
       }
       throw new Error(Date.now() >= overallDeadline ? TIMEOUT_MESSAGE : "네트워크가 원활하지 않습니다. 잠시 후 다시 시도해주세요.");
     } finally {
