@@ -264,6 +264,13 @@ body::before {
 }
 .card-title .icon { font-size: 1.1rem; }
 
+.todo-card { border: 1.5px solid var(--primary-soft); background: var(--primary-light); }
+.todo-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; font-size: 0.95rem; }
+.todo-row + .todo-row { border-top: 1px solid rgba(0,0,0,0.06); }
+.todo-status { font-size: 0.88rem; color: var(--gray-600); white-space: nowrap; }
+.todo-status.todo-done { color: var(--ok); font-weight: 700; }
+.todo-status.todo-due { color: var(--wait); font-weight: 700; }
+
 /* ===== Form Elements ===== */
 .form-group { margin-bottom: 20px; }
 .form-label {
@@ -806,7 +813,7 @@ body::before {
 .chip-exam { background: var(--exam-soft); color: var(--exam); }
 
 @media (max-width: 640px) {
-  .week-grid { grid-template-columns: 1fr; }
+  .week-grid { grid-template-columns: repeat(2, 1fr); }
   .stats-summary { grid-template-columns: 1fr; }
   .id-fields { flex-direction: column; }
 }
@@ -875,6 +882,11 @@ body::before {
       <div class="id-status" id="idStatus"></div>
       <div class="id-hint">이 기기에서는 다시 입력하지 않아도 됩니다. 공용 기기에서는 사용 후 정보 지우기를 눌러주세요.</div>
       <div class="id-privacy">수집 항목: 이름·학번·분반 (본인 확인 및 수강 명단 대조 목적, 학기 종료 후 삭제)</div>
+    </div>
+
+    <div class="card todo-card hidden" id="weeklyTodoCard">
+      <div class="card-title">이번 주 할 일</div>
+      <div id="weeklyTodoBody"></div>
     </div>
 
     <div id="studentTabs">
@@ -985,7 +997,8 @@ body::before {
           <span class="progress-text" id="quizProgressText">1/1</span>
         </div>
         <div id="questionDisplay"></div>
-        <div class="flex gap-8 mt-12">
+        <div id="quizSubmitReview" class="hidden"></div>
+        <div class="flex gap-8 mt-12" id="quizNavRow">
           <button class="btn btn-secondary" id="prevBtn" onclick="prevQuestion()">◀ 이전</button>
           <button class="btn btn-primary" style="flex:1" id="nextBtn" onclick="nextQuestion()">다음 ▶</button>
         </div>
@@ -996,7 +1009,7 @@ body::before {
         <div id="resultRecoveryNote" class="result-recovery-note hidden"></div>
         <div class="score-display">
           <div class="score-num" id="scoreNum">0/0</div>
-          <div class="score-label">정답 수 / 전체 문제</div>
+          <div class="score-label" id="scoreLabel">정답 수 / 전체 문제</div>
         </div>
         <div id="resultDetails"></div>
         <button class="btn btn-secondary btn-full mt-12" onclick="resetQuiz()">처음으로</button>
@@ -1511,6 +1524,9 @@ function renderIdSectionOptions() {
 function lockStudentTabs() {
   const el = document.getElementById("studentTabs");
   if (el) el.classList.add("locked");
+  // 본인 확인이 안 된 상태(과목 전환 직후 포함)에서 직전 과목의 "이번 주 할 일"이
+  // 그대로 남아있지 않도록 잠금과 함께 숨긴다.
+  document.getElementById("weeklyTodoCard")?.classList.add("hidden");
 }
 function unlockStudentTabs() {
   const el = document.getElementById("studentTabs");
@@ -1630,9 +1646,21 @@ async function reverifyMe() {
 function onIdentityReady(deadlines) {
   if (deadlines) applyDeadlines(deadlines);
   else loadDeadlines();
-  reloadStatusIfReady();
-  const statusTab = document.getElementById("tab-status");
-  if (statusTab && statusTab.classList.contains("active")) loadStatus();
+  // "이번 주 할 일" 카드가 항상 최신 상태를 보여줘야 하므로, [제출 현황] 탭이 열려
+  // 있는지와 무관하게 매번 불러온다 — statusResult는 비활성 탭 안에 있어 화면엔
+  // 안 보이지만, 나중에 그 탭을 열면 이미 채워져 있어 재조회 없이 바로 보인다.
+  // getSubmissionStatus는 응답이 느릴 수 있으므로(10초+ 걸린 전례 있음) 전체 화면
+  // 스피너로 다른 탭 사용을 막지 않도록 silent로 부르고, 카드 안에만 로딩 표시를 한다.
+  showTodoCardLoading();
+  loadStatus({ silent: true });
+}
+
+function showTodoCardLoading() {
+  const card = document.getElementById("weeklyTodoCard");
+  const body = document.getElementById("weeklyTodoBody");
+  if (!card || !body) return;
+  body.innerHTML = `<div style="color:var(--gray-600);font-size:0.9rem">불러오는 중...</div>`;
+  card.classList.remove("hidden");
 }
 
 function populateWeekDropdowns() {
@@ -1690,6 +1718,10 @@ const inFlightRequests = new Set();
 // 액션에 사용한다 — 호출부가 저장 여부를 직접 재확인한 뒤 필요할 때만 다시 보낸다.
 async function api(params, opts = {}) {
   const retryNetworkErrors = opts.retryNetworkErrors !== false;
+  // silent: 전체 화면 스피너를 띄우지 않는다 — 다른 탭 사용을 막으면 안 되는 백그라운드
+  // 호출(예: 본인 확인 직후 "이번 주 할 일" 카드 조회)에 쓴다. 그 호출 자체의 로딩
+  // 표시는 호출부가 각자(카드 안에 "불러오는 중" 등) 알아서 보여준다.
+  const silent = !!opts.silent;
   // 과목이 지정되지 않은 요청에는 현재 선택된 과목을 자동으로 붙인다.
   const body = (params.subject || !currentSubject) ? params : { ...params, subject: currentSubject.id };
 
@@ -1702,11 +1734,13 @@ async function api(params, opts = {}) {
     const remaining = overallDeadline - Date.now();
     if (remaining <= 0) throw new Error(TIMEOUT_MESSAGE);
 
-    showSpinner(
-      lockRetry > 0 ? `접속이 몰리고 있습니다. 재시도 중입니다... (${lockRetry}/${LOCK_RETRY_DELAYS_MS.length})`
-      : networkAttempt > 1 ? "처리 중입니다... (최대 10초 소요)"
-      : "최대 10초 소요됩니다..."
-    );
+    if (!silent) {
+      showSpinner(
+        lockRetry > 0 ? `접속이 몰리고 있습니다. 재시도 중입니다... (${lockRetry}/${LOCK_RETRY_DELAYS_MS.length})`
+        : networkAttempt > 1 ? "처리 중입니다... (최대 10초 소요)"
+        : "최대 10초 소요됩니다..."
+      );
+    }
 
     const controller = new AbortController();
     const attemptTimeout = Math.min(API_TIMEOUT_MS, remaining);
@@ -1750,7 +1784,7 @@ async function api(params, opts = {}) {
     } finally {
       clearTimeout(timer);
       inFlightRequests.delete(inFlightEntry);
-      hideSpinner();
+      if (!silent) hideSpinner();
     }
   }
 }
@@ -1957,17 +1991,25 @@ async function submitQuestion() {
 // =============================================
 // Tab3: Status
 // =============================================
-async function loadStatus() {
+// silent: 전체 화면 스피너 없이 백그라운드로 조회한다 — 본인 확인 직후 "이번 주 할 일"
+// 카드용으로 쓴다(getSubmissionStatus는 응답이 10초 넘게 걸린 전례가 있어, 그동안 다른
+// 탭을 못 쓰게 막으면 안 된다). 실패해도 카드만 조용히 숨기고 나머지 화면엔 영향 없음.
+async function loadStatus(opts = {}) {
   if (meVerifiedSubject !== (currentSubject && currentSubject.id)) return;
   const cls = me.sec[currentSubject.id];
 
   try {
-    const data = await api({ action:"getSubmissionStatus", name: me.name, student_id: me.no, class: cls });
+    const data = await api({ action:"getSubmissionStatus", name: me.name, student_id: me.no, class: cls }, { silent: opts.silent });
     renderSubmissionGrid(data.status);
     renderQuizGrid(data.status, cls);
+    renderTodoCard(data.status, cls);
     document.getElementById("statusResult").classList.remove("hidden");
   } catch(e) {
-    showToast(e.message, "error");
+    if (opts.silent) {
+      document.getElementById("weeklyTodoCard")?.classList.add("hidden");
+    } else {
+      showToast(e.message, "error");
+    }
   }
 }
 
@@ -2015,8 +2057,12 @@ function renderQuizGrid(statusList, cls) {
     } else if (s.quizDone) {
       cardCls = "week-card submitted";
       label = s.attempts > 1
-        ? `${s.attempts}회 응시, 최고 ${s.bestScore}/${s.bestTotal}점`
-        : `${s.lastScore}/${s.lastTotal}점`;
+        ? (s.bestPending > 0
+            ? `최고 ${s.bestScore}/${s.bestTotal}점 (확인중 ${s.bestPending})`
+            : `${s.attempts}회 응시, 최고 ${s.bestScore}/${s.bestTotal}점`)
+        : (s.lastPending > 0
+            ? `${s.lastScore}/${s.lastTotal}점 (확인중 ${s.lastPending})`
+            : `${s.lastScore}/${s.lastTotal}점`);
     } else if (!s.quiz_is_open) {
       cardCls = "week-card closed"; label = "응시마감";
     } else {
@@ -2028,6 +2074,87 @@ function renderQuizGrid(statusList, cls) {
     if (s.quizDone) card.onclick = () => showQuizAttempts(s.week);
     grid.appendChild(card);
   });
+}
+
+// "이번 주"를 정해진 하나의 주차 번호가 아니라 "아직 할 일이 남은 첫 주차"로 정의한다
+// — 제출/퀴즈 둘 다 끝났거나(완료) 마감이 지나 더 할 게 없으면(마감) 그 주차는 건너뛴다.
+function isWeekTodoSettled(s, cls) {
+  if (s.week_type === "exam") return true;
+  const submitSettled = s.state === "submitted" || s.state === "closed";
+  const hasQuiz = cls === 'A' ? s.hasQuizA : s.hasQuizB;
+  const quizSettled = !hasQuiz || s.quizDone || !s.quiz_is_open;
+  return submitSettled && quizSettled;
+}
+
+function renderTodoCard(statusList, cls) {
+  const card = document.getElementById("weeklyTodoCard");
+  const body = document.getElementById("weeklyTodoBody");
+  if (!card || !body) return;
+
+  const target = statusList.find(s => !isWeekTodoSettled(s, cls));
+  if (!target) {
+    card.classList.add("hidden");
+    body.innerHTML = "";
+    return;
+  }
+
+  const hasQuiz = cls === 'A' ? target.hasQuizA : target.hasQuizB;
+  const submitDone = target.state === "submitted";
+  const submitClosed = target.state === "closed";
+  const submitStatusHtml = submitDone
+    ? `<span class="todo-status todo-done">제출 완료 ✓</span>`
+    : submitClosed
+    ? `<span class="todo-status">제출 마감</span>`
+    : `<span class="todo-status todo-due">미제출 · 마감 ${formatDate(target.deadline)}</span>`;
+
+  let quizRowHtml = "";
+  const actionBtns = [];
+  if (!submitDone && !submitClosed) {
+    actionBtns.push(`<button class="btn btn-primary btn-sm" onclick="goToTodoAction(${target.week},'submit')">문제 제출하러 가기</button>`);
+  }
+  if (hasQuiz) {
+    const quizDone = target.quizDone;
+    const quizClosed = !target.quiz_is_open;
+    const quizStatusHtml = quizDone
+      ? `<span class="todo-status todo-done">퀴즈 응시 완료 ✓</span>`
+      : quizClosed
+      ? `<span class="todo-status">퀴즈 응시 마감</span>`
+      : `<span class="todo-status todo-due">퀴즈 미응시 · 마감 ${formatDate(target.quiz_deadline)}</span>`;
+    quizRowHtml = `<div class="todo-row"><span>${weekLabel(target.week)} 퀴즈</span>${quizStatusHtml}</div>`;
+    if (!quizDone && !quizClosed) {
+      actionBtns.push(`<button class="btn btn-primary btn-sm" onclick="goToTodoAction(${target.week},'quiz')">퀴즈 풀러 가기</button>`);
+    }
+  }
+
+  body.innerHTML = `
+    <div class="todo-row"><span>${weekLabel(target.week)} 문제 제출</span>${submitStatusHtml}</div>
+    ${quizRowHtml}
+    ${actionBtns.length ? `<div class="flex gap-8 flex-wrap mt-12">${actionBtns.join('')}</div>` : ''}
+  `;
+  card.classList.remove("hidden");
+}
+
+// switchTab()은 onclick의 전역 event.currentTarget에 의존해 탭 버튼을 활성화하므로,
+// 버튼 클릭이 아닌 곳(할 일 카드)에서 탭을 전환할 때는 직접 처리한다.
+function goToTodoAction(week, kind) {
+  const tabBtns = document.querySelectorAll("#studentTabs .tab-btn");
+  document.querySelectorAll("#studentView .tab-panel").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll("#studentView .tab-btn").forEach(b => b.classList.remove("active"));
+  if (kind === "quiz") {
+    document.getElementById("tab-quiz")?.classList.add("active");
+    tabBtns[1]?.classList.add("active");
+    // loadDeadlines()가 quiz-week 옵션 목록을 통째로 다시 그리므로, 그보다 먼저
+    // value를 지정하면 재조회가 끝나는 순간 선택이 초기화돼 버린다 — 반드시 완료 후에 설정.
+    loadDeadlines().then(() => {
+      const sel = document.getElementById("quiz-week");
+      if (sel) sel.value = String(week);
+    });
+  } else {
+    document.getElementById("tab-submit")?.classList.add("active");
+    tabBtns[0]?.classList.add("active");
+    const sel = document.getElementById("sub-week");
+    if (sel) sel.value = String(week);
+  }
 }
 
 // 객관식 보기 문자열("보기1|보기2|...")을 ①②③④ 목록 HTML로, 정답을 사람이 읽기 쉬운
@@ -2109,9 +2236,11 @@ async function showQuizAttempts(week) {
     const attempts = data.attempts || [];
     if (!attempts.length) return showToast("해당 주차에 응시한 퀴즈가 없습니다.", "info");
     myQuizAttemptsCache = attempts;
-    const btnsHtml = attempts.map(a =>
-      `<button class="btn btn-secondary btn-sm" id="qa-btn-${a.attempt_number}" onclick="showQuizAttemptDetail(${a.attempt_number})">${a.attempt_number}회 · ${a.score}/${a.total}점</button>`
-    ).join(' ');
+    const btnsHtml = attempts.map(a => {
+      const pendingCount = (a.items||[]).filter(it => it.pending).length;
+      const scoreLabel = pendingCount > 0 ? `${a.score}/${a.total}점 (확인중 ${pendingCount})` : `${a.score}/${a.total}점`;
+      return `<button class="btn btn-secondary btn-sm" id="qa-btn-${a.attempt_number}" onclick="showQuizAttemptDetail(${a.attempt_number})">${a.attempt_number}회 · ${scoreLabel}</button>`;
+    }).join(' ');
     const html = `<div class="flex gap-8 flex-wrap" style="margin-bottom:12px">${btnsHtml}</div><div id="quizAttemptDetailInner"></div>`;
     openModal(`${weekLabel(week)} 퀴즈 응시 기록 (${attempts.length}회)`, html);
     showQuizAttemptDetail(attempts[attempts.length - 1].attempt_number);
@@ -2124,7 +2253,13 @@ function showQuizAttemptDetail(attemptNumber) {
   if (!a || !el) return;
   document.querySelectorAll('[id^="qa-btn-"]').forEach(b => b.classList.toggle("btn-primary", b.id === `qa-btn-${attemptNumber}`));
 
+  const pendingCount = a.items.filter(it => it.pending).length;
+  const summaryHtml = pendingCount > 0
+    ? `<div class="result-pending" style="font-weight:600;margin-bottom:8px">자동채점 ${a.score}/${a.items.length - pendingCount} · 교수자 확인 중 ${pendingCount}문항 (최종 결과 아님)</div>`
+    : `<div class="result-correct" style="font-weight:600;margin-bottom:8px">최종 결과: ${a.score}/${a.total}</div>`;
+
   el.innerHTML = `<div style="font-size:0.8rem;color:var(--gray-500);margin-bottom:8px">${formatDate(a.timestamp)}</div>` +
+    summaryHtml +
     a.items.map((it, i) => {
       const statusHtml = it.pending
         ? '<span class="result-pending">교수자 확인중</span>'
@@ -2241,6 +2376,10 @@ function showResumeChoice(saved) {
 }
 
 function renderQuestion() {
+  document.getElementById("quizSubmitReview").classList.add("hidden");
+  document.getElementById("questionDisplay").classList.remove("hidden");
+  document.getElementById("quizNavRow").classList.remove("hidden");
+
   const q = quizData[currentQuestion];
   const total = quizData.length;
   const progress = ((currentQuestion + 1) / total) * 100;
@@ -2325,8 +2464,48 @@ function nextQuestion() {
     currentQuestion++;
     renderQuestion();
   } else {
-    submitQuiz();
+    showSubmitReview();
   }
+}
+
+function isQuestionAnswered(i) {
+  const a = quizAnswers[i];
+  return a !== null && a !== undefined && String(a).trim() !== "";
+}
+
+function jumpToQuestion(i) {
+  currentQuestion = i;
+  renderQuestion();
+}
+
+// 마지막 문제에서 바로 제출하지 않고, 미응답 문항이 있으면 한 번 더 보여주고 확인받는다.
+function showSubmitReview() {
+  const total = quizData.length;
+  const unansweredIdx = [];
+  for (let i = 0; i < total; i++) if (!isQuestionAnswered(i)) unansweredIdx.push(i);
+  const answeredCount = total - unansweredIdx.length;
+
+  document.getElementById("questionDisplay").classList.add("hidden");
+  document.getElementById("quizNavRow").classList.add("hidden");
+
+  const chipsHtml = unansweredIdx.map(i =>
+    `<button type="button" class="btn btn-secondary btn-sm" onclick="jumpToQuestion(${i})">${i+1}번</button>`
+  ).join(' ');
+
+  const el = document.getElementById("quizSubmitReview");
+  el.innerHTML = `
+    <div class="question-card" style="text-align:center">
+      <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px">응답 ${answeredCount}/${total}${unansweredIdx.length ? ` · 미응답 ${unansweredIdx.length}문항` : ''}</div>
+      ${unansweredIdx.length ? `
+        <div style="color:var(--gray-600);font-size:0.9rem;margin-bottom:10px">아직 답하지 않은 문항이 있습니다. 번호를 눌러 이동할 수 있어요.</div>
+        <div class="flex gap-8 flex-wrap" style="justify-content:center;margin-bottom:4px">${chipsHtml}</div>
+      ` : `<div style="color:var(--gray-600);font-size:0.9rem">모든 문항에 응답했습니다.</div>`}
+    </div>
+    <div class="flex gap-8 mt-12">
+      <button class="btn btn-secondary" style="flex:1" onclick="jumpToQuestion(${total - 1})">계속 풀기</button>
+      <button class="btn btn-primary" style="flex:1" onclick="this.disabled=true;submitQuiz()">최종 제출</button>
+    </div>`;
+  el.classList.remove("hidden");
 }
 
 // 채점은 서버(gradeQuiz)에서 수행 — 클라이언트는 정답을 절대 미리 알 수 없다.
@@ -2392,7 +2571,16 @@ async function handleGradeQuizFailure(nextBtn, prevBtn) {
 function renderQuizResult(score, total, items, note) {
   document.getElementById("quizScreen").classList.add("hidden");
   document.getElementById("quizResult").classList.remove("hidden");
-  document.getElementById("scoreNum").textContent = `${score}/${total}`;
+
+  const pendingCount = items.filter(it => it.pending).length;
+  const scoreLabelEl = document.getElementById("scoreLabel");
+  if (pendingCount > 0) {
+    document.getElementById("scoreNum").textContent = `${score}/${total - pendingCount}`;
+    if (scoreLabelEl) scoreLabelEl.innerHTML = `자동채점 결과 · <span class="result-pending">교수자 확인 중 ${pendingCount}문항</span> (최종 결과 아님)`;
+  } else {
+    document.getElementById("scoreNum").textContent = `${score}/${total}`;
+    if (scoreLabelEl) scoreLabelEl.textContent = "최종 결과 (정답 수 / 전체 문제)";
+  }
 
   const noteEl = document.getElementById("resultRecoveryNote");
   if (noteEl) {
@@ -2784,6 +2972,18 @@ function renderResultStats(stats) {
   `;
 }
 
+// 시트에는 score/total만 있고, 몇 문항이 교수자 확인 대기 중인지는 answers_json을
+// 파싱해야 알 수 있다 — 목록/상세에서 "최종 결과"로 오인하지 않도록 공통으로 쓴다.
+function attemptPendingCount(r) {
+  let items = [];
+  try { items = JSON.parse(r.answers_json || "[]"); } catch (e) { items = []; }
+  return items.filter(it => it.pending).length;
+}
+function attemptScoreText(r) {
+  const p = attemptPendingCount(r);
+  return p > 0 ? `${r.score}/${r.total} (확인중 ${p})` : `${r.score}/${r.total}`;
+}
+
 function renderAdminResults(list) {
   const el = document.getElementById("adminResultsList");
   if (!list.length) { el.innerHTML = '<p style="color:var(--gray-500);text-align:center;padding:20px">결과가 없습니다.</p>'; return; }
@@ -2800,8 +3000,8 @@ function renderAdminResults(list) {
     const first = attempts[0];
     const last = attempts[attempts.length - 1];
     const scoreHtml = attempts.length > 1
-      ? `<div>첫 ${first.score}/${first.total}</div><div>최근 ${last.score}/${last.total}</div><div>${attempts.length}회 응시</div>`
-      : `<div>${last.score}/${last.total}</div>`;
+      ? `<div>첫 ${attemptScoreText(first)}</div><div>최근 ${attemptScoreText(last)}</div><div>${attempts.length}회 응시</div>`
+      : `<div>${attemptScoreText(last)}</div>`;
     const detailBtns = attempts.map(a =>
       `<div class="result-attempt-row"><button class="btn btn-secondary btn-sm" onclick="showResultDetail(${a._row})">${a.attempt_number}회</button><span class="result-attempt-time">${formatDate(a.timestamp)}</span></div>`
     ).join('');
@@ -2826,7 +3026,12 @@ function showResultDetail(row) {
   try { items = JSON.parse(r.answers_json); } catch { items = []; }
   if (!items.length) return showToast("상세 답안이 없습니다.", "info");
 
-  const html = items.map((it, i) => {
+  const pendingCount = items.filter(it => it.pending).length;
+  const summaryHtml = pendingCount > 0
+    ? `<div class="result-pending" style="font-weight:600;margin-bottom:10px">자동채점 ${r.score}/${items.length - pendingCount} · 교수자 확인 대기 ${pendingCount}문항 (전부 채점되어야 최종 결과)</div>`
+    : `<div class="result-correct" style="font-weight:600;margin-bottom:10px">최종 결과: ${r.score}/${r.total}</div>`;
+
+  const html = summaryHtml + items.map((it, i) => {
     let statusHtml = it.pending
       ? `<span class="result-pending">미채점</span>
          <button class="btn btn-success btn-sm" onclick="gradeItemInModal(${r._row},${i},'correct',this)">맞음</button>
