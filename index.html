@@ -3629,40 +3629,60 @@ async function showStudentDetail(no) {
 // 판정 규칙은 학생 화면(renderSubmissionGrid/renderQuizGrid)과 같다: 열림 여부는
 // 서버가 계산한 is_open/quiz_is_open을 그대로 쓰고, 닫혀 있는데 기한이나 강제 마감이
 // 설정돼 있으면 "마감 후", 둘 다 없으면 기한 미설정("-")으로 본다.
-function studentSubmitCell(w, dl) {
+// 표와 개별 CSV가 같은 판정을 쓰도록 HTML이 아닌 상태 객체를 돌려준다:
+// chip(칩 색, null이면 "-"), label, meta(표에 보이는 보조 줄), hint(표에선 툴팁만).
+function studentSubmitStatus(w, dl) {
   if (w.submitted) {
     const st = w.submission && w.submission.status;
     const stLabel = st === "approved" ? "승인" : st === "rejected" ? "반려" : "검토 대기";
-    return `<span class="chip chip-ok">제출</span><div class="cell-meta">${stLabel}</div>`;
+    return { chip: "ok", label: "제출", meta: stLabel };
   }
-  if (w.week_type === "exam") return `<span class="chip chip-exam">시험기간</span>`;
+  if (w.week_type === "exam") return { chip: "exam", label: "시험기간" };
   if (dl && dl.is_open) {
-    return `<span class="chip chip-wait">미제출</span>${dl.deadline_date ? `<div class="cell-meta">~${formatDate(dl.deadline_date)}</div>` : ""}`;
+    return { chip: "wait", label: "미제출", meta: dl.deadline_date ? `~${formatDate(dl.deadline_date)}` : "" };
   }
   if (dl && (dl.deadline_date || dl.force_closed)) {
-    return `<span class="chip chip-bad">마감 후 미제출</span><div class="cell-meta">${dl.deadline_date ? `마감 ${formatDate(dl.deadline_date)}` : "강제 마감"}</div>`;
+    return { chip: "bad", label: "마감 후 미제출", meta: dl.deadline_date ? `마감 ${formatDate(dl.deadline_date)}` : "강제 마감" };
   }
-  return `<span class="cell-none" title="기한 미설정">-</span>`;
+  return { chip: null, label: "-", hint: "기한 미설정" };
 }
 
-function studentQuizCell(w, dl, sec) {
+function studentQuizStatus(w, dl, sec) {
   if (w.attempts > 0) {
     const last = w.results[w.results.length - 1];
     let pending = 0;
     try { pending = JSON.parse(last.answers_json).filter(it => it.pending).length; } catch (e) {}
-    const scoreText = `최근 ${w.lastScore}/${w.lastTotal}점${pending ? ` (확인중 ${pending})` : ""}`;
-    return `<span class="chip chip-ok">응시 ${w.attempts}회</span><div class="cell-meta">${scoreText}</div>`;
+    return { chip: "ok", label: `응시 ${w.attempts}회`, meta: `최근 ${w.lastScore}/${w.lastTotal}점${pending ? ` (확인중 ${pending})` : ""}` };
   }
-  if (w.week_type === "exam") return `<span class="cell-none" title="시험기간 (퀴즈 없음)">-</span>`;
+  if (w.week_type === "exam") return { chip: null, label: "-", hint: "시험기간 (퀴즈 없음)" };
   const hasQuiz = dl && (sec === "A" ? dl.hasQuizA : dl.hasQuizB);
-  if (!hasQuiz) return `<span class="cell-none">-</span><div class="cell-meta">퀴즈 없음</div>`;
+  if (!hasQuiz) return { chip: null, label: "-", meta: "퀴즈 없음" };
   if (dl.quiz_is_open) {
-    return `<span class="chip chip-wait">미응시</span>${dl.quiz_deadline_date ? `<div class="cell-meta">~${formatDate(dl.quiz_deadline_date)}</div>` : ""}`;
+    return { chip: "wait", label: "미응시", meta: dl.quiz_deadline_date ? `~${formatDate(dl.quiz_deadline_date)}` : "" };
   }
   if (dl.quiz_deadline_date || dl.quiz_force_closed) {
-    return `<span class="chip chip-bad">마감 후 미응시</span><div class="cell-meta">${dl.quiz_deadline_date ? `마감 ${formatDate(dl.quiz_deadline_date)}` : "강제 마감"}</div>`;
+    return { chip: "bad", label: "마감 후 미응시", meta: dl.quiz_deadline_date ? `마감 ${formatDate(dl.quiz_deadline_date)}` : "강제 마감" };
   }
-  return `<span class="cell-none" title="기한 미설정">-</span>`;
+  return { chip: null, label: "-", hint: "기한 미설정" };
+}
+
+function studentStatusCellHtml(s) {
+  const main = s.chip
+    ? `<span class="chip chip-${s.chip}">${escHtml(s.label)}</span>`
+    : `<span class="cell-none"${s.hint ? ` title="${escAttr(s.hint)}"` : ""}>${escHtml(s.label)}</span>`;
+  return main + (s.meta ? `<div class="cell-meta">${escHtml(s.meta)}</div>` : "");
+}
+
+// 과목 설정(config.js)의 주차 범위만 — 학생 화면 그리드와 같은 범위. 표와 CSV 공용.
+function studentDetailRows(data) {
+  const dlByWeek = {};
+  (data.deadlines || []).forEach(d => { dlByWeek[Number(d.week)] = d; });
+  const wStart = currentSubject ? currentSubject.weekStart : 0;
+  const wEnd = currentSubject ? currentSubject.weeks : 15;
+  return data.weeks.filter(w => w.week >= wStart && w.week <= wEnd).map(w => {
+    const dl = dlByWeek[w.week];
+    return { w, submit: studentSubmitStatus(w, dl), quiz: studentQuizStatus(w, dl, data.student.sec) };
+  });
 }
 
 function renderStudentDetail(data) {
@@ -3670,20 +3690,12 @@ function renderStudentDetail(data) {
   if (!el) return;
 
   const sec = data.student.sec;
-  const dlByWeek = {};
-  (data.deadlines || []).forEach(d => { dlByWeek[Number(d.week)] = d; });
-  // 과목 설정(config.js)의 주차 범위만 표시 — 학생 화면 그리드와 같은 범위.
-  const wStart = currentSubject ? currentSubject.weekStart : 0;
-  const wEnd = currentSubject ? currentSubject.weeks : 15;
-
-  const rows = data.weeks.filter(w => w.week >= wStart && w.week <= wEnd).map(w => {
-    const dl = dlByWeek[w.week];
-    return `<tr class="${w.week_type === "exam" ? "is-exam" : ""}">
+  const rows = studentDetailRows(data).map(({ w, submit, quiz }) => `
+    <tr class="${w.week_type === "exam" ? "is-exam" : ""}">
       <td class="col-week">${weekLabel(w.week)}</td>
-      <td>${studentSubmitCell(w, dl)}</td>
-      <td>${studentQuizCell(w, dl, sec)}</td>
-    </tr>`;
-  }).join("");
+      <td>${studentStatusCellHtml(submit)}</td>
+      <td>${studentStatusCellHtml(quiz)}</td>
+    </tr>`).join("");
 
   el.innerHTML = `
     <div class="card">
@@ -3760,8 +3772,13 @@ function showStudentRawResponses() {
 function downloadStudentCSV() {
   const data = studentDetailCache;
   if (!data) return;
-  const headers = ["주차","문제제출","퀴즈응시횟수","최근점수","최근총점"];
-  const rows = data.weeks.map(w => [w.week, w.submitted ? "제출" : "미제출", w.attempts, w.lastScore ?? "", w.lastTotal ?? ""]);
+  const headers = ["주차","분반","문제제출","제출비고","퀴즈응시","응시비고","퀴즈응시횟수","최근점수","최근총점"];
+  const rows = studentDetailRows(data).map(({ w, submit, quiz }) => [
+    w.week, data.student.sec,
+    submit.label, submit.meta || submit.hint || "",
+    quiz.label, quiz.meta || quiz.hint || "",
+    w.attempts, w.lastScore ?? "", w.lastTotal ?? ""
+  ]);
   downloadCSVFile(`student_${data.student.no}`, headers, rows);
 }
 
