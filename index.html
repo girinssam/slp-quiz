@@ -995,7 +995,7 @@ body::before {
         <div id="questionForm" class="hidden">
           <div class="form-group">
             <label class="form-label">문제 내용</label>
-            <textarea id="sub-question" class="form-textarea" placeholder="문제를 입력하세요"></textarea>
+            <textarea id="sub-question" class="form-textarea" maxlength="5000" placeholder="문제를 입력하세요"></textarea>
           </div>
 
           <!-- 객관식 보기 -->
@@ -1003,10 +1003,10 @@ body::before {
             <div class="form-group">
               <label class="form-label">보기 (4개)</label>
               <div class="choices-editor">
-                <input type="text" id="ch1" class="form-input" placeholder="① 보기 1">
-                <input type="text" id="ch2" class="form-input" placeholder="② 보기 2">
-                <input type="text" id="ch3" class="form-input" placeholder="③ 보기 3">
-                <input type="text" id="ch4" class="form-input" placeholder="④ 보기 4">
+                <input type="text" id="ch1" class="form-input" maxlength="500" placeholder="① 보기 1">
+                <input type="text" id="ch2" class="form-input" maxlength="500" placeholder="② 보기 2">
+                <input type="text" id="ch3" class="form-input" maxlength="500" placeholder="③ 보기 3">
+                <input type="text" id="ch4" class="form-input" maxlength="500" placeholder="④ 보기 4">
               </div>
             </div>
             <div class="form-group">
@@ -1042,7 +1042,7 @@ body::before {
 
           <div class="form-group">
             <label class="form-label">해설 <span style="font-weight:400;color:var(--gray-500);font-size:0.85rem">(선택, 퀴즈 결과 화면에 표시됩니다)</span></label>
-            <textarea id="sub-explanation" class="form-textarea" placeholder="정답에 대한 해설을 입력하세요 (선택)"></textarea>
+            <textarea id="sub-explanation" class="form-textarea" maxlength="5000" placeholder="정답에 대한 해설을 입력하세요 (선택)"></textarea>
           </div>
         </div>
 
@@ -1192,16 +1192,16 @@ body::before {
           </div>
           <div class="form-group">
             <label class="form-label">문제 내용</label>
-            <textarea id="profQuestion" class="form-textarea" placeholder="문제를 입력하세요"></textarea>
+            <textarea id="profQuestion" class="form-textarea" maxlength="5000" placeholder="문제를 입력하세요"></textarea>
           </div>
           <div id="profChoicesForm" class="hidden">
             <div class="form-group">
               <label class="form-label">보기 4개</label>
               <div class="choices-editor">
-                <input type="text" id="pch1" class="form-input" placeholder="① 보기 1">
-                <input type="text" id="pch2" class="form-input" placeholder="② 보기 2">
-                <input type="text" id="pch3" class="form-input" placeholder="③ 보기 3">
-                <input type="text" id="pch4" class="form-input" placeholder="④ 보기 4">
+                <input type="text" id="pch1" class="form-input" maxlength="500" placeholder="① 보기 1">
+                <input type="text" id="pch2" class="form-input" maxlength="500" placeholder="② 보기 2">
+                <input type="text" id="pch3" class="form-input" maxlength="500" placeholder="③ 보기 3">
+                <input type="text" id="pch4" class="form-input" maxlength="500" placeholder="④ 보기 4">
               </div>
             </div>
             <div class="form-group">
@@ -1232,7 +1232,7 @@ body::before {
           </div>
           <div class="form-group">
             <label class="form-label">해설 <span style="font-weight:400;color:var(--gray-500);font-size:0.85rem">(선택)</span></label>
-            <textarea id="profExplanation" class="form-textarea" placeholder="해설 (선택)"></textarea>
+            <textarea id="profExplanation" class="form-textarea" maxlength="5000" placeholder="해설 (선택)"></textarea>
           </div>
           <button class="btn btn-primary btn-full mt-8" onclick="addProfQuestion()">교수자 문제 추가</button>
         </div>
@@ -2198,9 +2198,14 @@ async function submitQuestion() {
   let choices = "";
   let answer = "";
 
+  const textProblem = questionTextProblem(question, explanation);
+  if (textProblem) return showToast(textProblem, "error");
+
   if (type === "객관식") {
     const ch = [1,2,3,4].map(i => document.getElementById(`ch${i}`).value.trim());
     if (ch.some(c => !c)) return showToast("보기 4개를 모두 입력해주세요.", "error");
+    const choiceProblem = choiceInputProblem(ch);
+    if (choiceProblem) return showToast(choiceProblem, "error");
     choices = ch.join("|");
     answer = document.querySelector('input[name="sub-mcq-ans"]:checked')?.value;
     if (!answer) return showToast("정답을 선택해주세요.", "error");
@@ -3103,8 +3108,27 @@ function toggleOriginalSubmission(row) {
   if (el) el.classList.toggle("hidden");
 }
 
-// 보기 한 칸의 최대 길이. 학생 제출 폼 보기 입력칸의 maxlength와 같은 값으로 맞춘다.
+// 보기 한 칸의 최대 길이. 학생 제출·교수자 추가 폼 보기 입력칸의 maxlength와 같은 값으로 맞춘다.
 const CHOICE_MAX_LEN = 500;
+// 문제·해설의 최대 길이. 두 폼의 문제·해설 textarea maxlength와 같은 값.
+const QUESTION_TEXT_MAX_LEN = 5000;
+const CHOICE_PIPE_MESSAGE = "보기에는 | 기호를 쓸 수 없어요. 표를 붙여넣었다면 보기마다 따로 입력해 주세요.";
+
+// 학생 제출(submitQuestion)·교수자 추가(addProfQuestion) 공용 보기 검사. 보기는 "|"로
+// 이어 저장하므로 보기 안의 "|"는 보기 개수를 깨뜨린다. maxlength는 스크립트나 확장
+// 프로그램이 값을 직접 넣으면 적용되지 않아 길이도 여기서 다시 확인한다.
+function choiceInputProblem(ch) {
+  if (ch.some(c => c.includes("|"))) return CHOICE_PIPE_MESSAGE;
+  const i = ch.findIndex(c => c.length > CHOICE_MAX_LEN);
+  if (i >= 0) return `보기 ${i + 1}번이 너무 길어요(${ch[i].length.toLocaleString()}자). ${CHOICE_MAX_LEN}자 이내로 줄여 주세요.`;
+  return null;
+}
+
+function questionTextProblem(question, explanation) {
+  if ((question || "").length > QUESTION_TEXT_MAX_LEN) return `문제가 너무 길어요(${question.length.toLocaleString()}자). ${QUESTION_TEXT_MAX_LEN.toLocaleString()}자 이내로 줄여 주세요.`;
+  if ((explanation || "").length > QUESTION_TEXT_MAX_LEN) return `해설이 너무 길어요(${explanation.length.toLocaleString()}자). ${QUESTION_TEXT_MAX_LEN.toLocaleString()}자 이내로 줄여 주세요.`;
+  return null;
+}
 
 // 검토 화면 보기 4칸 값 검사. 문제가 있으면 관리자에게 보여줄 메시지, 없으면 null.
 function reviewChoicesProblem(ch) {
@@ -3166,9 +3190,14 @@ async function addProfQuestion() {
 
   let choices = "";
   let answer = "";
+  const textProblem = questionTextProblem(question, explanation);
+  if (textProblem) return showToast(textProblem, "error");
+
   if (type === "객관식") {
     const ch = [1,2,3,4].map(i => document.getElementById(`pch${i}`).value.trim());
     if (ch.some(c => !c)) return showToast("보기 4개를 모두 입력해주세요.", "error");
+    const choiceProblem = choiceInputProblem(ch);
+    if (choiceProblem) return showToast(choiceProblem, "error");
     choices = ch.join("|");
     answer = document.querySelector('input[name="prof-mcq-ans"]:checked')?.value;
     if (!answer) return showToast("정답을 선택해주세요.", "error");
