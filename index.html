@@ -1885,6 +1885,7 @@ const LOCK_TIMEOUT_PATTERN = /잠금 시간초과/;
 const LOCK_BUSY_MESSAGE = "지금 접속이 몰리고 있습니다. 잠시 후 다시 시도해주세요.";
 const TIMEOUT_MESSAGE = "요청이 너무 오래 걸려 중단되었습니다. 잠시 후 다시 시도해주세요.";
 const NETWORK_ISSUE_MESSAGE = "네트워크가 원활하지 않습니다. 잠시 후 다시 시도해주세요.";
+const SERVER_BAD_RESPONSE_MESSAGE = "서버 오류: 서버 응답을 처리하지 못했습니다. 같은 문제가 계속되면 관리자에게 알려주세요.";
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -1948,7 +1949,19 @@ async function api(params, opts = {}) {
       });
       if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { isNetworkError: true });
 
-      const data = await res.json();
+      // 응답은 받았는데 JSON이 아니면(서버가 오류 페이지를 돌려준 경우 등) 네트워크 문제가
+      // 아니라 서버 쪽 문제다 — 같은 요청을 다시 보내도 같은 결과일 가능성이 커 재시도하지 않는다.
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        throw Object.assign(new Error(SERVER_BAD_RESPONSE_MESSAGE), { isServerError: true });
+      }
+      // serverError: 서버에서 예상하지 못한 예외(시트 저장 실패 등)가 난 경우. 메시지에
+      // 이미 "서버 오류"가 붙어 오므로 그대로 보여주고, 재시도하지 않는다.
+      if (!data.success && data.serverError) {
+        throw Object.assign(new Error(data.error || SERVER_BAD_RESPONSE_MESSAGE), { isServerError: true });
+      }
       if (!data.success && data.error) {
         if (LOCK_TIMEOUT_PATTERN.test(data.error)) {
           if (lockRetry < LOCK_RETRY_DELAYS_MS.length) {
