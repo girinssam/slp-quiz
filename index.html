@@ -2995,15 +2995,31 @@ function renderAdminSubmissions(list) {
       : '<span class="badge badge-warning">⏳ 대기</span>';
     const editedBadge = edited ? ' <span class="badge badge-warning">수정됨</span>' : '';
 
+    // 원본 보기가 "보기1|보기2|보기3|보기4" 4조각이 아니면(예: 학생이 | 가 섞인 클립보드
+    // 내용을 붙여넣어 수백 조각·수십만 자가 된 경우) 형식 이상으로 경고한다.
+    const origChoicesStr = String(s.choices || '');
+    const origChoiceCount = origChoicesStr.split('|').length;
+    const origChoicesBroken = s.question_type === "객관식" && origChoiceCount !== 4;
+
     let answerFieldsHtml;
     if (s.question_type === "객관식") {
       const choices = String(eff.choices || '').split('|');
       const ansVal = String(eff.answer || '');
+      const formatWarnHtml = origChoicesBroken
+        ? `<div style="background:#FFF5F5;color:var(--danger);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:0.9rem">⚠ 원본 보기 형식이 비정상입니다(${origChoiceCount}개, ${origChoicesStr.length.toLocaleString()}자). 승인하면 아래 보기 4칸 값만 저장됩니다.</div>`
+        : '';
+      // 한 칸에 숨은 내용이 붙어 있으면(입력칸에는 앞부분만 보임) 칸별로 길이를 알려준다.
+      const longHints = [0,1,2,3]
+        .filter(i => (choices[i] || '').length > CHOICE_MAX_LEN)
+        .map(i => `<div style="color:var(--danger);font-size:0.9rem;margin-top:4px">${MCQ_NUMS[i]} 칸에 보이지 않는 내용이 ${(choices[i]).length.toLocaleString()}자 들어 있습니다. 칸을 모두 지우고 보기를 다시 입력해 주세요.</div>`)
+        .join('');
       answerFieldsHtml = `
         <div class="form-group"><label class="form-label">보기 4개</label>
+          ${formatWarnHtml}
           <div class="choices-editor">
-            ${[0,1,2,3].map(i => `<input type="text" class="form-input" id="s-ch${i+1}-${row}" value="${escAttr(choices[i]||'')}" placeholder="${MCQ_NUMS[i]} 보기 ${i+1}">`).join('')}
+            ${[0,1,2,3].map(i => `<input type="text" class="form-input" id="s-ch${i+1}-${row}" value="${escAttr(choices[i]||'')}" placeholder="${MCQ_NUMS[i]} 보기 ${i+1}"${(choices[i]||'').length > CHOICE_MAX_LEN ? ' style="border-color:var(--danger)"' : ''}>`).join('')}
           </div>
+          ${longHints}
         </div>
         <div class="form-group"><label class="form-label">정답</label>
           <div class="radio-group">
@@ -3029,7 +3045,10 @@ function renderAdminSubmissions(list) {
 
     const originalToggleHtml = edited ? `<button type="button" class="btn btn-secondary btn-sm" onclick="toggleOriginalSubmission(${row})">원본 보기</button>` : '';
     const originalBoxHtml = edited ? (() => {
-      const orig = formatChoicesForReview(s.question_type, s.choices, s.answer);
+      // 형식이 깨진 원본(수십만 자)은 그대로 그리면 화면이 매우 무거워지므로 요약만 보여준다.
+      const orig = origChoicesBroken
+        ? { choicesHtml: `<div style="color:var(--danger)">보기 ${origChoiceCount}조각, ${origChoicesStr.length.toLocaleString()}자 — 비정상 데이터라 표시하지 않습니다.</div>`, answerText: escHtml(String(s.answer || '')) }
+        : formatChoicesForReview(s.question_type, s.choices, s.answer);
       return `<div class="hidden" id="s-orig-${row}" style="background:var(--gray-50);border-radius:8px;padding:10px;margin:8px 0;font-size:0.9rem">
         <div style="font-weight:600;color:var(--gray-600);margin-bottom:6px">원본 (학생 제출)</div>
         <div>${escHtml(s.question||'')}</div>
@@ -3084,6 +3103,20 @@ function toggleOriginalSubmission(row) {
   if (el) el.classList.toggle("hidden");
 }
 
+// 보기 한 칸의 최대 길이. 학생 제출 폼 보기 입력칸의 maxlength와 같은 값으로 맞춘다.
+const CHOICE_MAX_LEN = 500;
+
+// 검토 화면 보기 4칸 값 검사. 문제가 있으면 관리자에게 보여줄 메시지, 없으면 null.
+function reviewChoicesProblem(ch) {
+  const nums = ["①","②","③","④"];
+  for (let i = 0; i < 4; i++) {
+    if (!ch[i]) return `보기 ${nums[i]} 칸이 비어 있습니다.`;
+    if (ch[i].includes('|')) return `보기 ${nums[i]} 칸에 | 기호가 들어 있습니다. 지우고 다시 시도해 주세요.`;
+    if (ch[i].length > CHOICE_MAX_LEN) return `보기 ${nums[i]} 칸에 보이지 않는 내용이 많이 들어 있습니다(${ch[i].length.toLocaleString()}자, 최대 ${CHOICE_MAX_LEN}자). 칸을 모두 지우고 보기를 다시 입력한 뒤 승인해 주세요.`;
+  }
+  return null;
+}
+
 async function updateSubmission(row, status) {
   const s = adminSubmissionsCache.find(x => x._row === row);
   if (!s) return;
@@ -3091,7 +3124,16 @@ async function updateSubmission(row, status) {
   const explanation = document.getElementById(`s-exp-${row}`)?.value;
   let choices, answer;
   if (s.question_type === "객관식") {
-    choices = [1,2,3,4].map(i => document.getElementById(`s-ch${i}-${row}`)?.value || '').join('|');
+    // 화면의 보기 4칸 값만 저장한다(원본에 5번째 이후 조각이 있어도 버려짐).
+    const ch = [1,2,3,4].map(i => (document.getElementById(`s-ch${i}-${row}`)?.value || '').trim());
+    const problem = reviewChoicesProblem(ch);
+    if (!problem) {
+      choices = ch.join('|');
+    } else if (status === "approved") {
+      return showToast(problem, "error");
+    }
+    // 반려는 보기를 고칠 필요가 없으므로, 보기가 비정상이면 choices를 보내지 않고
+    // (서버는 undefined 필드를 건너뜀) 상태만 바꾼다.
     answer = document.querySelector(`input[name="s-mcq-ans-${row}"]:checked`)?.value;
   } else if (s.question_type === "OX") {
     answer = document.querySelector(`input[name="s-ox-ans-${row}"]:checked`)?.value;
